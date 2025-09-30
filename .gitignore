@@ -1,0 +1,17 @@
+# .gitignore for dataops_assistent project
+.env
+__pycache__/
+*.pyc
+# VS Code settings
+.vscode/
+# macOS system files
+.DS_Store
+
+# Output files
+output/
+
+# Data
+data/
+
+# Pipelines
+pipelines/

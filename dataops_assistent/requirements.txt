@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+openai
+python-dotenv
+jsonschema
+pandas
+minio
+boto3
+python-multipart
