@@ -1,4 +1,4 @@
-# .gitignore for dataops_assistent project
+# .gitignore for dataops_assistent_backend project
 .env
 __pycache__/
 *.pyc

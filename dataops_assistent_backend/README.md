@@ -1,4 +1,4 @@
-# dataops_assistent
+# dataops_assistent_backend
 
 A minimal FastAPI application with Docker support.
 
