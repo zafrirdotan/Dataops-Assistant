@@ -8,6 +8,7 @@ services:
     restart: unless-stopped
     depends_on:
       - minio
+      - postgres
     env_file:
       - .env
     environment:
@@ -16,6 +17,7 @@ services:
       - S3_SECRET_KEY=minioadmin
       - S3_BUCKET=dataops-bucket
       - DATA_FOLDER=/app/data
+      - DATABASE_URL=postgresql://dataops_user:dataops_password@postgres:5432/dataops_db
     volumes:
       - ./data:/app/data
 
@@ -32,5 +34,24 @@ services:
       - minio_data:/data
     restart: unless-stopped
 
+  postgres:
+    image: postgres:15-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=dataops_db
+      - POSTGRES_USER=dataops_user
+      - POSTGRES_PASSWORD=dataops_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./dataops_assistent_backend/init.sql:/docker-entrypoint-initdb.d/init.sql
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dataops_user -d dataops_db"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
 volumes:
   minio_data:
+  postgres_data:
