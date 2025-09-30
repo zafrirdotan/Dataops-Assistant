@@ -7,3 +7,8 @@ pandas
 minio
 boto3
 python-multipart
+pytest
+pytest-asyncio
+pytest-mock
+httpx
+pytest-cov
