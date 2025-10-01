@@ -37,11 +37,23 @@ class DatabaseService:
     def test_connection(self) -> bool:
         """Test database connection."""
         try:
-            with self.engine.connect() as connection:
-                result = connection.execute(text("SELECT 1"))
-                return result.fetchone()[0] == 1
-        except SQLAlchemyError as e:
+            logger.info("Testing database connection...")
+            logger.info(f"Using DATABASE_URL: {DATABASE_URL}")
+            
+            # Test the connection with explicit transaction handling
+            connection = self.engine.connect()
+            try:
+                result = connection.execute(text("SELECT 1 as test_value"))
+                row = result.fetchone()
+                success = row is not None and row[0] == 1
+                logger.info(f"Connection test result: {success}")
+                return success
+            finally:
+                connection.close()
+                
+        except Exception as e:
             logger.error(f"Database connection test failed: {e}")
+            logger.error(f"Exception type: {type(e).__name__}")
             return False
     
     def execute_query(self, query: str, params: dict = None):
@@ -74,6 +86,34 @@ class DatabaseService:
         except SQLAlchemyError as e:
             logger.error(f"Query execution failed: {e}")
             raise
+
+    def get_connection_info(self) -> dict:
+        """Get detailed connection information for debugging."""
+        try:
+            with self.engine.connect() as connection:
+                # Get database version and connection info
+                result = connection.execute(text("SELECT version()"))
+                db_version = result.fetchone()[0]
+                
+                result = connection.execute(text("SELECT current_database(), current_user, inet_server_addr(), inet_server_port()"))
+                conn_info = result.fetchone()
+                
+                return {
+                    "connected": True,
+                    "database_version": db_version,
+                    "current_database": conn_info[0],
+                    "current_user": conn_info[1],
+                    "server_address": conn_info[2],
+                    "server_port": conn_info[3],
+                    "connection_url": DATABASE_URL.replace(DATABASE_URL.split('@')[0].split('//')[1], '***:***')  # Hide credentials
+                }
+        except Exception as e:
+            return {
+                "connected": False,
+                "error": str(e),
+                "error_type": type(e).__name__,
+                "connection_url": DATABASE_URL.replace(DATABASE_URL.split('@')[0].split('//')[1], '***:***')
+            }
 
 
 # Global database service instance

@@ -3,6 +3,7 @@ import os
 import re
 from urllib import response
 from app.services.llm_service import LLMService
+from app.utils.json_utils import safe_json_dumps
 
 ALLOWED_PACKAGES = [
     "pandas>=2.0.0",
@@ -31,6 +32,7 @@ class PipelineCodeGenerator:
 
         pipeline_name = spec.get("pipeline_name")
 
+        print(f"data_preview: {data_preview}")  # For debugging purposes
         # Construct the prompt for the LLM
         # Todo: improve the file path handling
         prompt = f"""
@@ -38,10 +40,10 @@ class PipelineCodeGenerator:
             The allowed packages are: {', '.join(ALLOWED_PACKAGES)}.
 
             Given the following pipeline specification:
-            {json.dumps(spec, indent=2)}
+            {safe_json_dumps(spec, indent=2)}
 
             And the following data preview:
-            {json.dumps(data_preview, indent=2)}
+            {safe_json_dumps(data_preview, indent=2)}
 
             All generated files—the main code (`{pipeline_name}.py`), the requirements file (`requirements.txt`), and the unit test (`{pipeline_name}_test.py`)—should be placed in the same folder: `../pipelines/{pipeline_name}/`.
             In the unit test, import functions from `{pipeline_name}` (e.g., `from {pipeline_name} import ...`).

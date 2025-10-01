@@ -15,6 +15,10 @@ ETL_SPEC_SCHEMA = {
             "description": "The source of the data this will be a file path, database connection string, API endpoint, etc.",
             "enum": ["localFileCSV","localFileJSON",  "PostgreSQL", "api"],
         },
+        "source_table": {
+            "type": "string",
+            "description": "The name of the source table (if source is a database)",
+        },
         "source_path": {
             "type": "string",
             "description": "The path to the source file (if source is localFile)",
@@ -37,10 +41,9 @@ ETL_SPEC_SCHEMA = {
             "description": "Cron schedule for the pipeline",
         }
     },
-    "required": ["pipeline_name", "source_type", "source_path", "destination_type", "destination_name", "transformation", "schedule"],
+    "required": ["pipeline_name", "source_type", "source_path", "source_table", "destination_type", "destination_name", "transformation", "schedule"],
     "additionalProperties": False,
 }
-
 class PipelineSpecGenerator:
     """
     Service for generating pipeline specifications (specs) for ML/data pipelines.
@@ -56,20 +59,28 @@ class PipelineSpecGenerator:
         Returns:
             dict: A dictionary representing the pipeline specification.
         """
-        response = self.llm.response_create(
-            model = "gpt-4.1",
-            input = f"Generate a pipeline spec for: {user_input}",
-            temperature = 0,
-            text={
+        try:
+            response = self.llm.response_create(
+                model = "gpt-4.1",
+                input = f"Generate a pipeline spec for: {user_input}",
+                temperature = 0,
+                text={
                 "format": {
                     "type": "json_schema",
                     "name": "extract_json",
                     "strict": True,
                     "schema": ETL_SPEC_SCHEMA,
+                    }
                 }
-            }
-        )
+            )
+        except Exception as e:
+            raise RuntimeError(f"LLM request failed: {e}")
+
+        print(response)  # For debugging purposes
+
         spec = json.loads(response.output_text)
+
+        print(f"Generated spec: {spec}")  # For debugging purposes
 
         date_str = datetime.datetime.now().strftime('%Y%m%d_%H%M')
         # Append date to pipeline_name

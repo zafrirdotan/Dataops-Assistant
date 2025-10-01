@@ -61,6 +61,25 @@ CREATE TRIGGER update_pipelines_updated_at
     FOR EACH ROW 
     EXECUTE FUNCTION update_updated_at_column();
 
+-- Create transactions table for sample data
+CREATE TABLE IF NOT EXISTS public.transactions (
+    transaction_id VARCHAR(20) PRIMARY KEY,
+    user_id INTEGER,
+    account_id INTEGER,
+    transaction_date DATE,
+    transaction_time TIME,
+    amount DECIMAL(10,2),
+    currency VARCHAR(3),
+    merchant VARCHAR(100),
+    category VARCHAR(50),
+    transaction_type VARCHAR(20),
+    status VARCHAR(20),
+    location VARCHAR(100),
+    device VARCHAR(20),
+    balance_after DECIMAL(12,2),
+    notes TEXT
+);
+
 -- Insert some sample data (optional)
 INSERT INTO pipelines (name, description, spec, code, status) 
 VALUES 

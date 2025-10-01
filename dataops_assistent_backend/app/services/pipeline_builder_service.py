@@ -9,6 +9,9 @@ from app.services.generators.pipeline_spec_generator import PipelineSpecGenerato
 from app.services.generators.pipeline_spec_generator import ETL_SPEC_SCHEMA
 from app.services.source.local_file_service import LocalFileService
 from app.services.tests.test_pipline_service import TestPipelineService
+from app.services.database_service import get_database_service
+from app.utils.json_utils import make_json_serializable
+import pandas as pd
 
 class PipelineBuilderService:
     def __init__(self):
@@ -18,6 +21,7 @@ class PipelineBuilderService:
         self.llm = LLMService()
         self.spec_gen = PipelineSpecGenerator()
         self.local_file_service = LocalFileService()
+        self.database_service = get_database_service() 
         self.code_gen = PipelineCodeGenerator()
         self.test_service = TestPipelineService(self.log)
         # Add other initializations as needed
@@ -49,12 +53,17 @@ class PipelineBuilderService:
             generate_attempts += 1
 
             self.log.info("Generating pipeline code...")
-            code, requirements, python_test = self.code_gen.generate_code(spec,
+            try:
+                code, requirements, python_test = self.code_gen.generate_code(spec,
                                                                             db_info.get("data_preview"),
                                                                             last_code=code,
                                                                             last_error=last_error,
                                                                             python_test=python_test
                                                                             )
+            except Exception as e:
+                self.log.error(f"Pipeline code generation failed: {e}")
+                return {"error": f"Pipeline code generation failed: {e}"}
+            
             if not code:
                 self.log.error("Pipeline code generation failed.")
                 return {"error": "Pipeline code generation failed."}
@@ -123,29 +132,70 @@ class PipelineBuilderService:
         match spec.get("source_type"):
             case "PostgreSQL":
                 try: 
-                    local_db = self.postgres_service.connect(spec.get("source_config"))
+                    local_db = self.database_service.test_connection()
+                    self.log.info(f"PostgreSQL connection test result: {local_db}")
+
+                    data_preview = []
                     if local_db:
-                        data = self.postgres_service.retrieve_data(local_db, spec.get("source_table"))
-                        if data is not None:
-                            data_preview = data.head().to_dict(orient="records")
+                        source_table = spec.get('source_table')
+                        self.log.info(f"source_table from spec: {source_table}")
+                        if not source_table:
+                            return {"success": False, "error": "source_table is required for PostgreSQL source"}
+                        
+                        # Handle table name format (with or without schema)
+                        if '.' not in source_table:
+                            # If no schema specified, assume public schema
+                            table_name = f"public.{source_table}"
+                        else:
+                            table_name = source_table
+                        
+                        self.log.info(f"Fetching data from table: {table_name}")
+                        try:
+                            data = self.database_service.fetch_all(f"SELECT * FROM {table_name} LIMIT 5")
+                            self.log.info(f"PostgreSQL data fetch result: {data}")
+                            if data is not None and len(data) > 0:
+                                # Get column names
+                                table_only = source_table.split('.')[-1]  # Extract table name without schema
+                                schema_name = table_name.split('.')[0] if '.' in table_name else 'public'
+                                columns_query = f"SELECT column_name FROM information_schema.columns WHERE table_name = '{table_only}' AND table_schema = '{schema_name}' ORDER BY ordinal_position"
+                                column_results = self.database_service.fetch_all(columns_query)
+                                columns = [row[0] for row in column_results] if column_results else None
+                                
+                                # Convert to DataFrame for easier handling
+                                df = pd.DataFrame(data, columns=columns if columns else None)
+                                raw_preview = df.head().to_dict(orient="records")
+                                # Make JSON serializable
+                                data_preview = make_json_serializable(raw_preview)
+                                self.log.info(f"PostgreSQL data preview: {data_preview}")
+                            else:
+                                self.log.warning(f"No data found in table {table_name}")
+                        except Exception as e:
+                            self.log.error(f"Error fetching data from {table_name}: {e}")
+                            return {"success": False, "details": f"Error fetching data from table {table_name}: {e}"}
+                        
                         return {"success": True, "data_preview": data_preview}
                     else:
-                        return {"failed": False, "details": "No data retrieved from source table."}
+                        return {"success": False, "details": "Could not connect to PostgreSQL database"}
                 except Exception as e:
+                    self.log.error(f"PostgreSQL connection error: {e}")
                     return {"failed": False, "details": "Failed to connect to PostgreSQL source."}
 
             case "localFileCSV":
                 try:
                     data = self.local_file_service.retrieve_recent_data_files(spec.get("source_path"), date_column="event_date", date_value="2025-09-18")
                     if data is not None:
-                        data_preview = data.head().to_dict(orient="records")
+                        raw_preview = data.head().to_dict(orient="records")
+                        # Make JSON serializable
+                        data_preview = make_json_serializable(raw_preview)
                         return {"success": True, "data_preview": data_preview}
+                    else:
+                        return {"success": False, "details": "No recent data files found."}
                 except Exception as e:
                     return {"failed": False, "details": "Failed to connect to local CSV source."}
-                else:
-                    return {"success": False, "details": "No recent data files found."}
             case "localFileJSON":
                 if self.local_file_service.check_file_exists(spec.get("source_path")):
+                    # TODO: Implement JSON file reading and data preview generation
+                    data_preview = []  # Placeholder until JSON reading is implemented
                     return {"success": True, "data_preview": data_preview}
                 else:
                     return {"success": False, "details": "No recent data files found."}
