@@ -376,7 +376,7 @@ class PipelineCodeGenerator:
         - **Data Validation:** Ensure file exists and format matches source type
         - **Error Handling:** Handle file not found, encoding issues, and malformed data
         - **Processing:** Ingest ALL available data regardless of file size
-        - **File Pattern:** `os.path.join(DATA_FOLDER, '{spec.get('source_file', 'input_file')}')`
+        - **File Pattern:** `os.path.join(DATA_FOLDER, '{spec.get('source_path', 'input_file')}')`
             """
         
         elif source_type == 'postgresql':
@@ -428,7 +428,7 @@ class PipelineCodeGenerator:
         - **File Management:** Ensure output directory exists before writing
         - **Naming:** Use descriptive filenames with timestamps if needed
         - **Partitioning:** For Parquet, use year/month grouping to avoid system limits
-        - **File Pattern:** `os.path.join(output_path, '{spec.get('destination_file', 'output_file')}')`
+        - **File Pattern:** `os.path.join(output_path, '{spec.get('destination_name', 'output_file')}')`
             """
         
         elif dest_type == 'postgresql':
