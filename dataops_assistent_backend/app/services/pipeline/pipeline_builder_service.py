@@ -54,6 +54,10 @@ class PipelineBuilderService:
         while True:
             generate_attempts += 1
 
+            if generate_attempts > 3:
+                self.log.error("Max retry attempts reached.")
+                return {"error": "Max retry attempts reached."}
+
             self.log.info("Generating pipeline code...")
             try:
                 code, requirements, python_test = self.code_gen.generate_code(spec,
@@ -90,10 +94,7 @@ class PipelineBuilderService:
             else:
                 last_error = test_result.get("details")
                 self.log.error("Unit test failed. Retrying pipeline code generation...")
-            # Optionally, add a retry limit to avoid infinite loops
-            if generate_attempts > 3:
-                self.log.error("Max retry attempts reached.")
-                return {"error": "Max retry attempts reached."}
+         
         self.log.info("Pipeline code generation and unit tests completed successfully. After %d attempts.", generate_attempts)
 
         # # 8. Deploy
