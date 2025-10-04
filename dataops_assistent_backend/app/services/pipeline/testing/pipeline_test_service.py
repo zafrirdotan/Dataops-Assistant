@@ -138,20 +138,3 @@ class PipelineTestService:
             self.log.error(f"Unit test failed for {pipeline_name} with exception: {e}")
             return {"success": False, "details": str(e)}
 
-    def create_and_run_unittest(self, name: str, code: str, requirements: str, 
-                              python_test: str, execution_mode="venv") -> dict:
-        """
-        Creates pipeline files and runs unit tests.
-        
-        Args:
-            name: Pipeline name
-            code: Python code for the pipeline
-            requirements: Requirements.txt content
-            python_test: Test code
-            execution_mode: Either 'venv' or 'docker'
-            
-        Returns:
-            dict: Test result with success status and details
-        """
-        folder = self.output_service.create_pipeline_files(name, code, requirements, python_test)
-        return self.run_pipeline_test(folder, name, execution_mode)

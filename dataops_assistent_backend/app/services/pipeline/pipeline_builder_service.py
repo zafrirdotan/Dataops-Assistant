@@ -11,6 +11,7 @@ from .sources.local_file_service import LocalFileService
 from .testing.pipeline_test_service import PipelineTestService
 from app.services.database_service import get_database_service
 from app.utils.json_utils import make_json_serializable
+from .deployment.pipeline_output_service import PipelineOutputService
 import pandas as pd
 
 class PipelineBuilderService:
@@ -23,6 +24,7 @@ class PipelineBuilderService:
         self.local_file_service = LocalFileService()
         self.database_service = get_database_service() 
         self.code_gen = PipelineCodeGenerator()
+        self.output_service = PipelineOutputService()
         self.test_service = PipelineTestService(self.log)
         # Add other initializations as needed
 
@@ -44,7 +46,7 @@ class PipelineBuilderService:
             self.log.error("Source/Destination connection failed.")
             return {"error": "Source/Destination connection failed.", "details": db_info.get("details")}
 
-        # 5-6. Generate pipeline code and run unit test, retry if unit test fails
+        # 5-7. Generate pipeline code, build files, and run unit test, retry if unit test fails
         generate_attempts = 0
         code = None
         python_test = None
@@ -69,7 +71,20 @@ class PipelineBuilderService:
                 return {"error": "Pipeline code generation failed."}
 
             self.log.info("Creating and running unit tests...")
-            test_result = self.create_and_run_unittest(spec, code, requirements, python_test)
+
+            try:
+                folder = self.output_service.create_pipeline_files(spec.get("pipeline_name"), code, requirements, python_test)
+            except Exception as e:
+                self.log.error(f"Failed to create pipeline files: {e}")
+
+            self.log.info("Running pipeline tests...")
+
+            try:
+                test_result = self.test_service.run_pipeline_test(folder, spec.get("pipeline_name"), execution_mode="venv")
+            except Exception as e:
+                self.log.error(f"Failed to run pipeline tests: {e}")
+
+
             if test_result.get("success"):
                 break
             else:
@@ -81,12 +96,12 @@ class PipelineBuilderService:
                 return {"error": "Max retry attempts reached."}
         self.log.info("Pipeline code generation and unit tests completed successfully. After %d attempts.", generate_attempts)
 
-        # # 7. Deploy
+        # # 8. Deploy
         # deploy_result = self.deploy_pipeline(code)
         # if not deploy_result.get("success"):
         #     return {"error": "Deployment failed.", "details": deploy_result.get("details")}
 
-        # # 8. E2E tests
+        # # 9. E2E tests
         # e2e_result = self.run_e2e_tests(deploy_result)
         # if not e2e_result.get("success"):
         #     return {"error": "E2E tests failed.", "details": e2e_result.get("details")}
@@ -205,9 +220,6 @@ class PipelineBuilderService:
                 pass
 
         return {"success": True}
-
-    def create_and_run_unittest(self, spec: dict, code: str, requirements: str, python_test: str) -> dict:
-        return self.test_service.create_and_run_unittest(spec.get("pipeline_name"), code, requirements, python_test, execution_mode="venv")
 
     def deploy_pipeline(self, code: str) -> dict:
         # TODO: Implement deployment logic
