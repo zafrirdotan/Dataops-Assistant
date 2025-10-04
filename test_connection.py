@@ -10,7 +10,7 @@ import os
 # Add the app directory to the Python path
 sys.path.append('/Users/zafrirdotan/Documents/dev/ml-ops/Projects/Dataops-Assistant/dataops_assistent_backend')
 
-from app.services.pipeline_builder_service import PipelineBuilderService
+from app.services.pipeline import PipelineBuilderService
 import logging
 
 # Set up logging

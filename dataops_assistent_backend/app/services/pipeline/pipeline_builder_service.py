@@ -2,13 +2,13 @@ import logging
 import jsonschema
 import runpy
 
-from app.services.generators.pipeline_code_generator import PipelineCodeGenerator
-from app.services.guards.prompt_guard_service import PromptGuardService
+from .generators.pipeline_code_generator import PipelineCodeGenerator
+from .guards.prompt_guard_service import PromptGuardService
 from app.services.llm_service import LLMService
-from app.services.generators.pipeline_spec_generator import PipelineSpecGenerator
-from app.services.generators.pipeline_spec_generator import ETL_SPEC_SCHEMA
-from app.services.source.local_file_service import LocalFileService
-from app.services.tests.test_pipline_service import TestPipelineService
+from .generators.pipeline_spec_generator import PipelineSpecGenerator
+from .generators.pipeline_spec_generator import ETL_SPEC_SCHEMA
+from .sources.local_file_service import LocalFileService
+from .testing.pipeline_test_service import PipelineTestService
 from app.services.database_service import get_database_service
 from app.utils.json_utils import make_json_serializable
 import pandas as pd
@@ -23,7 +23,7 @@ class PipelineBuilderService:
         self.local_file_service = LocalFileService()
         self.database_service = get_database_service() 
         self.code_gen = PipelineCodeGenerator()
-        self.test_service = TestPipelineService(self.log)
+        self.test_service = PipelineTestService(self.log)
         # Add other initializations as needed
 
     def build_pipeline(self, user_input: str) -> dict:

@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from app.services.chat_service import ChatService
-from app.services.guards.prompt_guard_service import PromptGuardService
+from app.services.pipeline.guards.prompt_guard_service import PromptGuardService
 from dotenv import load_dotenv
 
 load_dotenv()

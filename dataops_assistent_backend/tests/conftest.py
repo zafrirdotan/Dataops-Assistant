@@ -55,7 +55,7 @@ def mock_llm_service():
 @pytest.fixture
 def mock_prompt_guard():
     """Mock prompt guard service."""
-    with patch('app.services.guards.prompt_guard_service.PromptGuardService') as mock:
+    with patch('app.services.pipeline.guards.prompt_guard_service.PromptGuardService') as mock:
         mock_instance = Mock()
         mock.return_value = mock_instance
         yield mock_instance
@@ -64,7 +64,7 @@ def mock_prompt_guard():
 @pytest.fixture
 def mock_pipeline_builder():
     """Mock pipeline builder service."""
-    with patch('app.services.pipeline_builder_service.PipelineBuilderService') as mock:
+    with patch('app.services.pipeline.pipeline_builder_service.PipelineBuilderService') as mock:
         mock_instance = Mock()
         mock.return_value = mock_instance
         yield mock_instance

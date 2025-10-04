@@ -1,6 +1,6 @@
 from app.services.llm_service import LLMService
-from app.services.guards.prompt_guard_service import PromptGuardService
-from app.services.pipeline_builder_service import PipelineBuilderService
+from app.services.pipeline.guards.prompt_guard_service import PromptGuardService
+from app.services.pipeline import PipelineBuilderService
 
 class ChatService:
     def __init__(self):
