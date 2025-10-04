@@ -12,7 +12,7 @@ class TestPipelineBuilderService:
     """Test cases for the PipelineBuilderService."""
 
     @patch('app.services.pipeline_builder_service.TestPipelineService')
-    @patch('app.services.pipeline_builder_service.PipelineCodeGenerator')
+    @patch('app.services.pipeline_builder_service.PipelineCodeGeneratorDSPy')
     @patch('app.services.pipeline_builder_service.LocalFileService')
     @patch('app.services.pipeline_builder_service.PipelineSpecGenerator')
     @patch('app.services.pipeline_builder_service.LLMService')
@@ -32,7 +32,7 @@ class TestPipelineBuilderService:
         assert service.test_service is not None
 
     @patch('app.services.pipeline_builder_service.TestPipelineService')
-    @patch('app.services.pipeline_builder_service.PipelineCodeGenerator')
+    @patch('app.services.pipeline_builder_service.PipelineCodeGeneratorDSPy')
     @patch('app.services.pipeline_builder_service.LocalFileService')
     @patch('app.services.pipeline_builder_service.PipelineSpecGenerator')
     @patch('app.services.pipeline_builder_service.LLMService')
@@ -78,7 +78,7 @@ class TestPipelineBuilderService:
         mock_spec_instance.generate_spec.assert_called_once_with("create a pipeline")
 
     @patch('app.services.pipeline_builder_service.TestPipelineService')
-    @patch('app.services.pipeline_builder_service.PipelineCodeGenerator')
+    @patch('app.services.pipeline_builder_service.PipelineCodeGeneratorDSPy')
     @patch('app.services.pipeline_builder_service.LocalFileService')
     @patch('app.services.pipeline_builder_service.PipelineSpecGenerator')
     @patch('app.services.pipeline_builder_service.LLMService')
@@ -99,7 +99,7 @@ class TestPipelineBuilderService:
         assert service.validate_source_path(spec_invalid) is False
 
     @patch('app.services.pipeline_builder_service.TestPipelineService')
-    @patch('app.services.pipeline_builder_service.PipelineCodeGenerator')
+    @patch('app.services.pipeline_builder_service.PipelineCodeGeneratorDSPy')
     @patch('app.services.pipeline_builder_service.LocalFileService')
     @patch('app.services.pipeline_builder_service.PipelineSpecGenerator')
     @patch('app.services.pipeline_builder_service.LLMService')

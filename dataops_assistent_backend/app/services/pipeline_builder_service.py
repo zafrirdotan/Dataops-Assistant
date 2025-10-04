@@ -2,7 +2,7 @@ import logging
 import jsonschema
 import runpy
 
-from app.services.generators.pipeline_code_generator import PipelineCodeGenerator
+from app.services.generators.pipeline_code_generator_dspy import PipelineCodeGeneratorDSPy
 from app.services.guards.prompt_guard_service import PromptGuardService
 from app.services.llm_service import LLMService
 from app.services.generators.pipeline_spec_generator import PipelineSpecGenerator
@@ -22,7 +22,7 @@ class PipelineBuilderService:
         self.spec_gen = PipelineSpecGenerator()
         self.local_file_service = LocalFileService()
         self.database_service = get_database_service() 
-        self.code_gen = PipelineCodeGenerator()
+        self.code_gen = PipelineCodeGeneratorDSPy()
         self.test_service = TestPipelineService(self.log)
         # Add other initializations as needed
 
