@@ -85,9 +85,153 @@ class PipelineCodeGenerator:
             Please fix the code to resolve the error.
             """
 
+# ...existing code...
+
+        prompt_v2 = f"""
+                ## CONTEXT
+                You are an expert Python 3.13 engineer generating production-quality ETL pipeline code.
+
+                **Pipeline Specification:**
+                {safe_json_dumps(spec, indent=2)}
+
+                **Data Preview:**
+                {safe_json_dumps(data_preview, indent=2)}
+
+                ## CONSTRAINTS
+                - **Python Version:** 3.13 with best practices
+                - **Allowed Packages:** {', '.join(ALLOWED_PACKAGES)}
+                - **Code Quality:** Use type hints, modular structure, and error handling
+
+                ## FILE STRUCTURE REQUIREMENTS
+                - **Main Code:** `../pipelines/{pipeline_name}/{pipeline_name}.py`
+                - **Requirements:** `../pipelines/{pipeline_name}/requirements.txt`
+                - **Unit Test:** `../pipelines/{pipeline_name}/{pipeline_name}_test.py`
+                - **Output Directory:** `../pipelines/{pipeline_name}/output/`
+                - Ensure this folder exists before writing files
+
+                ## DATA HANDLING REQUIREMENTS
+                ### Input Data Loading
+                ```python
+                from dotenv import load_dotenv
+                import os
+                load_dotenv()
+                DATA_FOLDER = os.getenv('DATA_FOLDER')
+                ```
+                - Use `DATA_FOLDER` for all input file paths
+
+                ### ETL Processing
+                - **Data Ingestion:** Process ALL available data regardless of records/partitions
+                - **Date Column:** Ensure DataFrame has 'date' column (add today's date if missing)
+                - **Parquet Partitioning:** 
+                - Prefer year/month grouping to avoid system limits
+                - Write without partitioning if too many unique dates
+
+                ## TESTING REQUIREMENTS
+                - **Framework:** pytest
+                - **Import Pattern:** `from {pipeline_name} import ...`
+                - **Coverage:** Test main transformation function for correctness
+
+                ## OUTPUT FORMAT
+                Return exactly three code blocks in this order:
+                1. ```python
+                [main pipeline code]
+                ```
+                2. ```requirements.txt
+                [package dependencies]
+                ```
+                3. ```python test
+                [unit test code]
+                ```
+
+                **Important:** Return ONLY the three code blocks. No explanations or extra text.
+                """
+
+        # Error handling section
+        if last_code and last_error:
+            prompt_v2 += f"""
+                ## ERROR CORRECTION
+                The previous code execution failed. Please fix the following:
+
+                **Error:**
+                {last_error}
+
+                **Previous Code:**
+                {last_code}
+
+                **Previous Test:**
+                {python_test}
+
+                Fix the issues and regenerate all three code blocks.
+                """
+
+# ...existing code...
+        # prompt = f"""
+        #     You are an expert Python 3.13 engineer. 
+        #     Generate production-quality code following best practices. 
+
+        #     Constraints:
+        #     - Allowed packages: {', '.join(ALLOWED_PACKAGES)}
+        #     - Use idiomatic Python, type hints, and clear modular structure.
+        #     - Ensure reproducibility and robustness in file handling.
+
+        #     Context:
+        #     Pipeline specification:
+        #     {safe_json_dumps(spec, indent=2)}
+
+        #     Data preview:
+        #     {safe_json_dumps(data_preview, indent=2)}
+
+        #     Requirements:
+        #     1. **File structure**:
+        #     - Place all generated files in: `../pipelines/{pipeline_name}/`
+        #     - Output files must be written to: `../pipelines/{pipeline_name}/output/`
+        #     - Ensure the output folder exists before writing.
+
+        #     2. **Environment variables**:
+        #     - Input data path must be loaded from `.env`:
+        #         ```python
+        #         from dotenv import load_dotenv
+        #         import os
+        #         load_dotenv()
+        #         DATA_FOLDER = os.getenv("DATA_FOLDER")
+        #         ```
+        #     - Always use `DATA_FOLDER` for reading input files.
+
+        #     3. **ETL pipeline**:
+        #     - Ingest all available data, regardless of records or partitions.
+        #     - For Parquet partitioning, avoid system limits:
+        #         * Prefer partitioning by year/month.
+        #         * If too many partitions, write without partitioning.
+        #     - Ensure the DataFrame has a `date` column. If missing, add today’s date.
+
+        #     4. **Testing**:
+        #     - Provide a unit test using `pytest`.
+        #     - Test must import from `{pipeline_name}` (e.g., `from {pipeline_name} import ...`).
+        #     - Test should verify correctness of the main transformation function.
+
+        #     5. **Outputs**:
+        #     - Return exactly three code blocks, in this order:
+        #         1. Main Python code (` ```python ... ``` `)
+        #         2. `requirements.txt` (` ```requirements.txt ... ``` `)
+        #         3. Unit test (` ```python test ... ``` `)
+
+        #     6. **Formatting**:
+        #     - Do not include explanations, comments outside code, or extra text.
+
+        #     Error handling:
+        #     If provided, here is the last execution error and code. Fix the problem in the new version:
+        #     Error:
+        #     {last_error if last_error else "None"}
+
+        #     Last generated code:
+        #     {last_code if last_code else "None"}
+
+        #     Last unit test:
+        #     {python_test if python_test else "None"}
+        #     """
         response = self.llm.response_create(
             model="gpt-4.1",
-            input=prompt,
+            input=prompt_v2,
             temperature=0,
         )
 
