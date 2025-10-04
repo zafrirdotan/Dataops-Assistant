@@ -1,4 +1,5 @@
 import os
+import shutil
 from typing import Dict
 
 class PipelineOutputService:
@@ -8,7 +9,9 @@ class PipelineOutputService:
     """
     
     def __init__(self):
-        pass
+        # Get the path to the .env template in the same directory as this service
+        self.template_dir = os.path.dirname(__file__)
+        self.env_template_path = os.path.join(self.template_dir, ".env.template")
     
     def create_pipeline_files(self, pipeline_name: str, code: str, requirements: str, 
                             python_test: str, output_dir="../pipelines") -> str:
@@ -43,10 +46,14 @@ class PipelineOutputService:
         with open(test_path, "w") as f:
             f.write(python_test)
                 
-        # Create environment file
+        # Create environment file by copying from template
         env_path = os.path.join(folder, ".env")
-        with open(env_path, "w") as f:
-            f.write("DATA_FOLDER=../../data\n")
+        # if os.path.exists(self.env_template_path):
+        shutil.copy2(self.env_template_path, env_path)
+        # else:
+        #     # Fallback to basic content if template doesn't exist
+        #     with open(env_path, "w") as f:
+        #         f.write("DATA_FOLDER=../../data\n")
             
         return folder
     
@@ -100,3 +107,30 @@ CMD ["python", "{pipeline_name}.py"]
         Delegates to create_pipeline_files.
         """
         return self.create_pipeline_files(pipeline_name, code, requirements, python_test, output_dir)
+    
+    def get_env_template_path(self) -> str:
+        """
+        Returns the path to the environment template file.
+        
+        Returns:
+            str: Path to the .env.template file
+        """
+        return self.env_template_path
+    
+    def update_env_template(self, content: str) -> bool:
+        """
+        Updates the environment template file with new content.
+        
+        Args:
+            content: New content for the template
+            
+        Returns:
+            bool: True if update was successful, False otherwise
+        """
+        try:
+            with open(self.env_template_path, "w") as f:
+                f.write(content)
+            return True
+        except Exception as e:
+            print(f"Error updating .env template: {e}")
+            return False
