@@ -20,6 +20,8 @@ services:
       - DATABASE_URL=postgresql://dataops_user:dataops_password@postgres:5432/dataops_db
     volumes:
       - ./data:/app/data
+        # TODO: REMOVE FOR PRODUCTION - Development volume mount for hot-reload
+      - ./dataops_assistent_backend:/app
 
   minio:
     image: minio/minio:latest
