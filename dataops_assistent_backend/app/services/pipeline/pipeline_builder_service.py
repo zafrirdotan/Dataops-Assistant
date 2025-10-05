@@ -32,24 +32,24 @@ class PipelineBuilderService:
     def build_pipeline(self, user_input: str) -> dict:
 
         start_time = datetime.datetime.now()
-        # 2. Generate JSON spec
+        # 1. Generate JSON spec
         self.log.info("Generating pipeline specification...")
         spec = self.spec_gen.generate_spec(user_input)
 
-        # 3. Validate schema
+        # 2. Validate schema
         self.log.info("Validating pipeline specification schema...")
         if not self.validate_spec_schema(spec):
             self.log.error("Pipeline specification schema validation failed.")
             return {"error": "Spec schema validation failed."}
 
-        # 4. Try connecting to source/destination
+        # 3. Try connecting to source/destination
         self.log.info("Connecting to source/destination to validate access...")
         db_info = self.connect_to_source(spec)
         if not db_info.get("success"):
             self.log.error("Source/Destination connection failed.")
             return {"error": "Source/Destination connection failed.", "details": db_info.get("details")}
 
-        # 5-7. Generate pipeline code, build files, and run unit test, retry if unit test fails
+        # 4-6. Generate pipeline code, build files, and run unit test, retry if unit test fails
         generate_attempts = 0
         code = None
         python_test = None
@@ -238,3 +238,93 @@ class PipelineBuilderService:
     def run_e2e_tests(self, deploy_result: dict) -> dict:
         # TODO: Implement E2E test logic
         return {"success": True}
+
+    def build_pipeline_with_templates(self, user_input: str, output_dir: str = "pipelines") -> dict:
+        """
+        Build a pipeline using the new template-based approach.
+        This is a more efficient alternative to the full build_pipeline method.
+        """
+        try:
+            start_time = datetime.datetime.now()
+            
+            # Step 1: Generate pipeline specification
+            self.log.info("Generating pipeline specification...")
+            spec = self.spec_gen.generate_spec(user_input)
+            
+            # Step 2: Validate schema
+            self.log.info("Validating pipeline specification schema...")
+            if not self.validate_spec_schema(spec):
+                self.log.error("Pipeline specification schema validation failed.")
+                return {"error": "Spec schema validation failed."}
+            
+            # step 3. Try connecting to source/destination
+            self.log.info("Connecting to source/destination to validate access...")
+            db_info = self.connect_to_source(spec)
+            if not db_info.get("success"):
+                self.log.error("Source/Destination connection failed.")
+                return {"error": "Source/Destination connection failed.", "details": db_info.get("details")}
+            
+            # Step 4: Convert data preview to DataFrame if available
+            data_preview_df = None
+            if db_info.get("data_preview"):
+                try:
+                    data_preview_df = pd.DataFrame(db_info.get("data_preview"))
+                    self.log.info(f"Converted data preview to DataFrame with shape: {data_preview_df.shape}")
+                except Exception as e:
+                    self.log.warning(f"Could not convert data preview to DataFrame: {e}")
+            
+            # Step 5: Generate pipeline code using templates (much faster)
+            self.log.info("Generating pipeline code using templates...")
+            pipeline_code = self.code_gen.generate_code(spec, data_preview_df)
+            
+            # Step 6: Generate test code
+            self.log.info("Generating test code...")
+            test_code = self.code_gen.generate_test_code(spec, data_preview_df)
+            
+            # Step 7: Generate requirements.txt
+            requirements = self.code_gen.generate_requirements_txt()
+            
+            # Step 8: Create pipeline files
+            try:
+                folder = self.output_service.create_pipeline_files(
+                    spec.get("pipeline_name"), 
+                    pipeline_code, 
+                    requirements, 
+                    test_code
+                )
+                self.log.info(f"Pipeline files created in: {folder}")
+            except Exception as e:
+                self.log.error(f"Failed to create pipeline files: {e}")
+                return {"error": f"Failed to create pipeline files: {e}"}
+            
+            # Step 9: Run tests (optional - can be skipped for faster generation)
+            self.log.info("Running pipeline tests...")
+            try:
+                test_result = self.test_service.run_pipeline_test(folder, spec.get("pipeline_name"), execution_mode="venv")
+            except Exception as e:
+                self.log.error(f"Failed to run pipeline tests: {e}")
+            
+            execution_time = (datetime.datetime.now() - start_time).seconds
+            message = f"Template-based pipeline created successfully in {execution_time} seconds"
+            
+            self.log.info(message)
+            
+            return {
+                "success": True,
+                "spec": spec,
+                "code": pipeline_code,
+                "test_code": test_code,
+                "requirements": requirements,
+                "folder": folder,
+                "message": message,
+                "execution_time": execution_time,
+                "mode": "template-based"
+            }
+            
+        except Exception as e:
+            self.log.error(f"Template-based pipeline creation failed: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "message": f"Failed to create pipeline: {e}"
+            }

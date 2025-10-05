@@ -37,7 +37,7 @@ class ChatService:
                 }
 
         # Step 2: Generate pipeline 
-        build_result = self.pipeline_builder_service.build_pipeline(analysis["cleaned"])
+        build_result = self.pipeline_builder_service.build_pipeline_with_templates(analysis["cleaned"])
 
         # Step 4: Sanitize the LLM response for display
         # sanitized_response = self.prompt_guard_service.sanitize_for_display(llm_response)

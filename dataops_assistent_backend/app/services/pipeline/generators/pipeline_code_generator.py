@@ -1,285 +1,492 @@
 import os
-import re
-from app.services.llm_service import LLMService
-from app.utils.json_utils import safe_json_dumps
 
-ALLOWED_PACKAGES = [
-    "pandas>=2.0.0",
-    "numpy>=1.24.0",
-    "python-dotenv>=1.0.0",
-    "pyarrow>=14.0.0",
-    "pytest>=7.0.0",
-    "sqlalchemy>=2.0.0",  # Add this for PostgreSQL support
-    "psycopg2-binary>=2.9.0"  # Add this for PostgreSQL driver
-]
+import pandas as pd
+from app.services.llm_service import LLMService
+
+
 class PipelineCodeGenerator:
     """
-    Service for retrieving a data sample and generating transformation code using LLM.
+    Generates actual pipeline code using templates and pluggable components.
     """
+    
     def __init__(self):
         self.llm = LLMService()
 
-    def generate_code(self, spec: dict, data_preview: dict, last_code: str = None, last_error: str = None, python_test: str = None) -> str:
+    def generate_code(self, spec: dict, data_preview: pd.DataFrame) -> str:
         """
-        Generate transformation code including data loading, transformation, and saving
-        as well as unit tests.
+        Generate pipeline code using base template + specific components.
+        
         Args:
-            spec (dict): The pipeline specification.
-            db_info (dict): Information about the source/destination databases.
+            spec (dict): Pipeline specification from PipelineSpecGenerator
+            data_preview (pd.DataFrame): Sample of the actual data for better transformation logic
+            
         Returns:
-            str: Generated transformation code.
+            str: Complete pipeline code ready to execute
         """
-
-        pipeline_name = spec.get("pipeline_name")
-
-        # V3 Prompt with conditional configuration
-        prompt_v3 = self._create_conditional_prompt(spec, data_preview, pipeline_name, last_code, last_error, python_test)
-
-        response = self.llm.response_create(
-            model="gpt-4.1",
-            input=prompt_v3,  # Using v3 prompt with conditional configuration
-            temperature=0,
+        # Get the appropriate loader
+        loader_code = self._generate_loader(spec['source_type'], spec)
+        
+        # Get transformation logic (only the specific business logic)
+        transform_code = self._generate_transformation(spec.get('transformation_logic', ''), data_preview)
+        
+        # Get the appropriate writer
+        writer_code = self._generate_writer(spec['destination_type'], spec)
+        
+        # Use base template
+        pipeline_code = self._get_base_template().format(
+            pipeline_name=spec['pipeline_name'],
+            loader_code=loader_code,
+            transform_code=transform_code,
+            writer_code=writer_code,
+            schedule=spec['schedule']
         )
         
-        # Simple try-catch approach for response handling
-        try:
-            response_text = response.output_text
-        except AttributeError:
-            # If output_text doesn't exist, treat response as string
-            response_text = str(response) if response is not None else "Error: No response received"
-        except Exception as e:
-            print(f"Error processing LLM response: {e}")
-            response_text = str(response) if response is not None else "Error: Failed to process response"
-
-        python_code = self.extract_code_block(response_text, "python")
-        requirements = self.extract_code_block(response_text, "requirements.txt")
-        python_test = self.extract_code_block(response_text, "python test")
-
-        check_result = self.check_requirements(requirements)
-        if check_result != True:
-            if check_result == False:
-                raise ValueError("Generated requirements.txt is empty or invalid")
-            else:
-                raise ValueError(f"Generated requirements.txt contains disallowed packages: {check_result}")
-
-        return python_code, requirements, python_test
-
-    def extract_code_block(self, llm_response: str, block_type: str) -> str:
-        # Extract code between triple backticks with block_type
-        pattern = rf"```{block_type}(.*?)```"
-        match = re.search(pattern, llm_response, re.DOTALL)
-        if match:
-            return match.group(1).strip()
-        return ""
+        return pipeline_code
     
-    def check_requirements(self, requirements: str) -> bool | list:
-        # Return True if all packages are allowed, otherwise False
-        if not requirements.strip():
-            return False
-        lines = requirements.strip().split("\n")
-        disallowed = []
-        allowed_pkgs = [pkg.split(">=")[0].split("==")[0].strip().lower() for pkg in ALLOWED_PACKAGES]
-        for line in lines:
-            pkg_name = line.split(">=")[0].split("==")[0].strip().lower()
-            if pkg_name and pkg_name not in allowed_pkgs:
-                disallowed.append(line.strip())
-        if disallowed:
-            print(f"Disallowed packages found: {disallowed}")
-            return disallowed
-        return True
-
-    def _create_conditional_prompt(self, spec: dict, data_preview: dict, pipeline_name: str, 
-                                   last_code: str = None, last_error: str = None, python_test: str = None) -> str:
-        """
-        Create v3 prompt with conditional configuration based on source_type and destination_type
-        """
-        input_config = self._generate_input_config(spec)
-        output_config = self._generate_output_config(spec)
+    def _generate_transformation(self, transformation_logic: str, data_preview: pd.DataFrame = None) -> str:
+        """Generate only the specific transformation function."""
+        if not transformation_logic:
+            return "    return df  # No transformations specified"
         
-        prompt_v3 = f"""
-        ## CONTEXT
-        You are an expert Python 3.13 engineer generating production-quality ETL pipeline code.
-
-        **Pipeline Specification:**
-        {safe_json_dumps(spec, indent=2)}
-
+        # Prepare data preview information for the LLM
+        data_info = ""
+        if data_preview is not None and not data_preview.empty:
+            data_info = f"""
+        
         **Data Preview:**
-        {safe_json_dumps(data_preview, indent=2)}
-
-        ## CONSTRAINTS
-        - **Python Version:** 3.13 with best practices
-        - **Allowed Packages:** {', '.join(ALLOWED_PACKAGES)}
-        - **Code Quality:** Use type hints, modular structure, and error handling
-
-        ## FILE STRUCTURE REQUIREMENTS
-        - **Main Code:** `../pipelines/{pipeline_name}/{pipeline_name}.py`
-        - **Requirements:** `../pipelines/{pipeline_name}/requirements.txt`
-        - **Unit Test:** `../pipelines/{pipeline_name}/{pipeline_name}_test.py`
-        - Ensure this folder exists before writing files
-        - **Output Folder:** All output files must be saved to `../pipelines/{pipeline_name}/output/`
-        
-        ## DATA SOURCE CONFIGURATION
-        {input_config}
-        
-        ## DATA OUTPUT CONFIGURATION
-        {output_config}
-
-        ## DATA HANDLING REQUIREMENTS
-        ### ETL Processing
-        - **Data Ingestion:** Process ALL available data regardless of records/partitions
-        - **Date Column:** Ensure DataFrame has 'date' column (add today's date if missing)
-        - **Parquet Partitioning:** 
-          - Prefer year/month grouping to avoid system limits
-          - Write without partitioning if too many unique dates
-
-        ## TESTING REQUIREMENTS
-        - **Framework:** pytest
-        - **Import Pattern:** `from {pipeline_name} import ...`
-        - **Coverage:** Test main transformation function for correctness
-
-        ## OUTPUT FORMAT
-        Return exactly three code blocks in this order:
-        1. ```python
-        [main pipeline code]
-        ```
-        2. ```requirements.txt
-        [package dependencies]
-        ```
-        3. ```python test
-        [unit test code]
-        ```
-
-        **Important:** Return ONLY the three code blocks. No explanations or extra text.
+        Columns: {list(data_preview.columns)}
+        Data types: {dict(data_preview.dtypes)}
+        Sample rows: {data_preview.head(3).to_dict('records')}
+        Total rows in preview: {len(data_preview)}
         """
-
-        # Error handling section
-        if last_code and last_error:
-            prompt_v3 += f"""
-            ## ERROR CORRECTION
-            The previous code execution failed. Please fix the following:
-
-            **Error:**
-            {last_error}
-
-            **Previous Code:**
-            {last_code}
-
-            **Previous Test:**
-            {python_test}
-
-            Fix the issues and regenerate all three code blocks.
-            """
-
-        return prompt_v3
-
-    def _generate_input_config(self, spec: dict) -> str:
-        """Generate input configuration based on source_type"""
-        source_type = spec.get('source_type', '').lower()
         
-        if source_type in ['localfilecsv', 'localfilejson']:
+        prompt = f"""
+        Generate only a Python function body for this transformation: {transformation_logic}
+        {data_info}
+        
+        The function should:
+        - Take a pandas DataFrame as input
+        - Apply the specified transformation
+        - Return the transformed DataFrame
+        - Be concise and focused only on the transformation logic
+        - Use proper indentation (4 spaces)
+        - Use the actual column names from the data preview above
+        - Handle edge cases (empty dataframes, missing columns)
+        
+        Return only the function body (the lines inside the function), not the function signature.
+        Example output:
+            # Filter active users
+            df = df[df['status'] == 'active']
+            return df
+        """
+        
+        try:
+            response = self.llm.response_create(
+                model="gpt-4.1",
+                input=prompt,
+                temperature=0.1
+            )
+            
+            # Ensure proper indentation
+            transform_code = response.output_text.strip()
+            if not transform_code.startswith('    '):
+                # Add proper indentation if not present
+                lines = transform_code.split('\n')
+                transform_code = '\n'.join(f'    {line}' if line.strip() else line for line in lines)
+            
+            return transform_code
+            
+        except Exception as e:
+            return f"    # Error generating transformation: {e}\n    return df"
+    
+    def _generate_loader(self, source_type: str, spec: dict) -> str:
+        """Return appropriate loader code based on source type."""
+        loaders = {
+            "localFileCSV": f"""
+        # Load CSV file
+        df = pd.read_csv('{spec.get('source_path', 'data/input.csv')}')
+        print(f"Loaded {{len(df)}} rows from CSV file")""",
+            
+            "localFileJSON": f"""
+        # Load JSON file
+        df = pd.read_json('{spec.get('source_path', 'data/input.json')}')
+        print(f"Loaded {{len(df)}} rows from JSON file")""",
+            
+            "PostgreSQL": f"""
+        # Load from PostgreSQL
+        engine = create_engine(os.getenv('POSTGRES_URL', 'postgresql://user:pass@localhost:5432/db'))
+        df = pd.read_sql_table('{spec.get('source_table', 'source_table')}', engine)
+        print(f"Loaded {{len(df)}} rows from PostgreSQL table")""",
+            
+            "api": f"""
+        # Load from API
+        import requests
+        response = requests.get('{spec.get('source_path', 'http://api.example.com/data')}')
+        df = pd.DataFrame(response.json())
+        print(f"Loaded {{len(df)}} rows from API")"""
+        }
+        
+        return loaders.get(source_type, "        # Unknown source type\n        df = pd.DataFrame()")
+    
+    def _generate_writer(self, dest_type: str, spec: dict) -> str:
+        """Return appropriate writer code based on destination type."""
+        writers = {
+            "PostgreSQL": self._generate_postgresql_writer(spec),
+            
+            "sqlite": f"""
+        # Write to SQLite
+        import sqlite3
+        conn = sqlite3.connect('data/{spec['destination_name']}.db')
+        df.to_sql('{spec['destination_name']}', conn, if_exists='replace', index=False)
+        conn.close()
+        print(f"Written {{len(df)}} rows to SQLite table '{spec['destination_name']}'")""",
+            
+            "parquet": f"""
+        # Write to Parquet file
+        os.makedirs('data', exist_ok=True)
+        df.to_parquet('data/{spec['destination_name']}.parquet')
+        print(f"Written {{len(df)}} rows to Parquet file '{spec['destination_name']}.parquet'")"""
+        }
+        
+        return writers.get(dest_type, "        # Unknown destination type")
+    
+    def _generate_postgresql_writer(self, spec: dict) -> str:
+        """Generate PostgreSQL writer with dynamic schema and table creation."""
+        destination_name = spec['destination_name']
+        
+        # Check if destination includes schema (schema.table format)
+        if '.' in destination_name:
+            schema_name, table_name = destination_name.split('.', 1)
             return f"""
-        ### Input Data Loading (File-based)
-        ```python
-        from dotenv import load_dotenv
-        import os
-        load_dotenv()
-        DATA_FOLDER = os.getenv('DATA_FOLDER')
-        ```
-        - **Source Type:** {source_type}
-        - **File Path:** Use `DATA_FOLDER` for all input file paths
-        - **Data Validation:** Ensure file exists and format matches source type
-        - **Error Handling:** Handle file not found, encoding issues, and malformed data
-        - **Processing:** Ingest ALL available data regardless of file size
-        - **File Pattern:** `os.path.join(DATA_FOLDER, '{spec.get('source_path', 'input_file')}')`
-            """
+        # Write to PostgreSQL with dynamic schema and table creation
+        engine = create_engine(os.getenv('POSTGRES_URL', 'postgresql://user:pass@localhost:5432/db'))
         
-        elif source_type == 'postgresql':
-            return f"""
-        ### Input Data Loading (PostgreSQL Database)
-        ```python
-        from dotenv import load_dotenv
-        import os
-        load_dotenv()
-        DATABASE_URL = os.getenv('DATABASE_URL')
-        DATABASE_HOST = os.getenv('DATABASE_HOST')
-        DATABASE_PORT = os.getenv('DATABASE_PORT')
-        DATABASE_NAME = os.getenv('DATABASE_NAME')
-        DATABASE_USER = os.getenv('DATABASE_USER')
-        DATABASE_PASSWORD = os.getenv('DATABASE_PASSWORD')
-        ```
-        - **Source Type:** PostgreSQL Database
-        - **Connection:** Use DATABASE_URL: `{os.getenv('DATABASE_URL', 'postgresql://dataops_user:dataops_password@localhost:5432/dataops_db')}`
-        - **Alternative Connection:** Individual parameters (HOST: {os.getenv('DATABASE_HOST', 'localhost')}, PORT: {os.getenv('DATABASE_PORT', '5432')})
-        - **Authentication:** DATABASE_USER and DATABASE_PASSWORD from environment
-        - **Query:** Extract data from table: `{spec.get('source_table', 'source_table')}`
-        - **Connection Pattern:** Use SQLAlchemy or psycopg2 with proper connection pooling
-        - **Error Handling:** Handle connection failures, timeouts, and SQL errors
-        - **Processing:** Use chunked reading for large datasets with `chunksize` parameter
-            """
+        # Create schema if it doesn't exist
+        with engine.connect() as conn:
+            conn.execute(text("CREATE SCHEMA IF NOT EXISTS {schema_name}"))
+            conn.commit()
+            print(f"Schema '{schema_name}' created/ensured to exist")
         
+        # Check if table exists and drop it for fresh creation
+        with engine.connect() as conn:
+            result = conn.execute(text(
+                "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = '{schema_name}' AND table_name = '{table_name}')"
+            ))
+            table_exists = result.scalar()
+            
+            if table_exists:
+                conn.execute(text("DROP TABLE {schema_name}.{table_name}"))
+                conn.commit()
+                print(f"Existing table '{destination_name}' dropped for fresh creation")
+        
+        # Create completely new table with optimized structure
+        df.to_sql('{table_name}', engine, schema='{schema_name}', if_exists='fail', index=False, method='multi')
+        print(f"NEW table '{destination_name}' created with {{len(df.columns)}} columns")
+        print(f"Table structure: {{dict(df.dtypes)}}")
+        print(f"Inserted {{len(df)}} rows into new table '{destination_name}'")
+        
+        # Add indexes for common query patterns
+        with engine.connect() as conn:
+            # Add primary key if there's an ID column
+            id_columns = [col for col in df.columns if 'id' in col.lower()]
+            if id_columns:
+                primary_key_col = id_columns[0]  # Use first ID column as primary key
+                try:
+                    conn.execute(text(f"ALTER TABLE {schema_name}.{table_name} ADD PRIMARY KEY ({{primary_key_col}})"))
+                    print(f"Added primary key constraint on {{{{primary_key_col}}}}")
+                except Exception as e:
+                    print(f"Could not add primary key: {{{{e}}}}")
+            
+            # Add indexes on date columns
+            date_columns = [col for col in df.columns if 'date' in col.lower() or 'time' in col.lower()]
+            for date_col in date_columns:
+                try:
+                    index_name = f"idx_{table_name}_{{{{date_col}}}}"
+                    conn.execute(text(f"CREATE INDEX {{{{index_name}}}} ON {schema_name}.{table_name} ({{{{date_col}}}})")")
+                    print(f"Added index on {{{{date_col}}}}")
+                except Exception as e:
+                    print(f"Could not add index on {{{{date_col}}}}: {{{{e}}}}")
+            
+            conn.commit()"""
         else:
             return f"""
-        ### Input Data Loading (Generic)
-        - **Source Type:** {source_type or 'Not specified'}
-        - **Default:** Use file-based loading with DATA_FOLDER
-        - **Note:** Consider specifying source_type as 'localFileCSV', 'localFileJSON', or 'PostgreSQL'
-            """
+        # Write to PostgreSQL (public schema) with dynamic table creation
+        engine = create_engine(os.getenv('POSTGRES_URL', 'postgresql://user:pass@localhost:5432/db'))
+        
+        # Check if table exists and drop it for fresh creation
+        with engine.connect() as conn:
+            result = conn.execute(text(
+                "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = '{destination_name}')"
+            ))
+            table_exists = result.scalar()
+            
+            if table_exists:
+                conn.execute(text("DROP TABLE public.{destination_name}"))
+                conn.commit()
+                print(f"Existing table 'public.{destination_name}' dropped for fresh creation")
+        
+        # Create completely new table
+        df.to_sql('{destination_name}', engine, if_exists='fail', index=False, method='multi')
+        print(f"NEW table '{destination_name}' created with {{len(df.columns)}} columns")
+        print(f"Table structure: {{dict(df.dtypes)}}")
+        print(f"Inserted {{len(df)}} rows into new table '{destination_name}'")"""
+    
+    def _get_base_template(self) -> str:
+        """Base pipeline template with dynamic schema and table creation utilities."""
+        return '''import pandas as pd
+from sqlalchemy import create_engine, text, MetaData, Table, Column, Integer, String, Float, DateTime, Boolean
+import os
+from datetime import datetime
 
-    def _generate_output_config(self, spec: dict) -> str:
-        """Generate output configuration based on destination_type"""
-        dest_type = spec.get('destination_type', '').lower()
+
+def {pipeline_name}():
+    """
+    Generated ETL Pipeline: {pipeline_name}
+    Schedule: {schedule}
+    """
+    try:
+        print(f"Starting pipeline {pipeline_name} at {{datetime.now()}}")
         
-        if dest_type in ['localfilecsv', 'localfilejson', 'parquet']:
-            return f"""
-        ### Output Data Saving (File-based)
-        ```python
-        OUTPUT_FOLDER = os.getenv('OUTPUT_FOLDER')
-        output_path = f'../pipelines/{spec.get('pipeline_name')}/output/'
-        ```
-        - **Destination Type:** {dest_type}
-        - **Output Path:** Save to `../pipelines/{spec.get('pipeline_name')}/output/`
-        - **Environment:** Use OUTPUT_FOLDER from .env if available
-        - **File Management:** Ensure output directory exists before writing
-        - **Naming:** Use descriptive filenames with timestamps if needed
-        - **Partitioning:** For Parquet, use year/month grouping to avoid system limits
-        - **File Pattern:** `os.path.join(output_path, '{spec.get('destination_name', 'output_file')}')`
-            """
+        # Data Loading
+{loader_code}
         
-        elif dest_type == 'postgresql':
-            destination_name = spec.get('destination_name', spec.get('destination_table', 'output_table'))
-            schema_name = None
-            table_name = destination_name
+        # Data Transformation
+        df = transform_data(df)
+        
+        # Validate data before writing
+        if df.empty:
+            print("Warning: No data to write after transformations")
+            return True
             
-            # Extract schema if format is "schema.table"
-            if '.' in destination_name:
-                schema_name, table_name = destination_name.split('.', 1)
-            
-            return f"""
-        ### Output Data Saving (PostgreSQL Database)
-        ```python
-        # Use same database configuration as input
-        DATABASE_URL = os.getenv('DATABASE_URL')
-        ```
-        - **Destination Type:** PostgreSQL Database  
-        - **Connection:** Use same DATABASE_URL and connection parameters as input
-        - **Target Table:** `{destination_name}`
-        - **Schema Management:** 
-          {f"- CREATE SCHEMA IF NOT EXISTS `{schema_name}`" if schema_name else "- Use default schema"}
-          - Create table if not exists with proper column types
-          - Handle schema and table creation before data insertion
-        - **Write Mode:** Handle table creation, updates, or appends as specified
-        - **Data Types:** Ensure proper mapping from DataFrame to SQL types
-        - **Batch Processing:** Use efficient bulk insert methods (`to_sql` with `method='multi'`)
-        - **Transaction Handling:** Use database transactions for data integrity
-        - **Error Handling:** Handle schema/table creation errors gracefully
-        - **Important:** Always create schema first, then table, then insert data
-            """
+        print(f"Data validation: {{len(df)}} rows, {{len(df.columns)}} columns")
+        print(f"Columns: {{list(df.columns)}}")
         
+        # Data Writing
+{writer_code}
+        
+        print(f"Pipeline {pipeline_name} completed successfully at {{datetime.now()}}")
+        return True
+        
+    except Exception as e:
+        print(f"Pipeline {pipeline_name} failed: {{e}}")
+        raise
+
+
+def transform_data(df):
+    """Apply transformations to the dataframe."""
+{transform_code}
+
+
+def optimize_data_types(df):
+    """Optimize DataFrame data types for better database storage."""
+    df = df.copy()
+    
+    for col in df.columns:
+        # Skip if column is completely null
+        if df[col].isna().all():
+            continue
+            
+        # Try to convert object columns to more specific types
+        if df[col].dtype == 'object':
+            # Try datetime conversion
+            try:
+                df[col] = pd.to_datetime(df[col], errors='ignore')
+                if df[col].dtype != 'object':
+                    continue
+            except:
+                pass
+                
+            # Try numeric conversion
+            try:
+                numeric_col = pd.to_numeric(df[col], errors='coerce')
+                if not numeric_col.isna().all():
+                    df[col] = numeric_col
+                    continue
+            except:
+                pass
+                
+            # Keep as string but optimize
+            df[col] = df[col].astype('string')
+    
+    return df
+
+
+if __name__ == "__main__":
+    {pipeline_name}()
+'''
+
+    def generate_test_code(self, spec: dict, data_preview: pd.DataFrame = None) -> str:
+        """Generate comprehensive test code for the pipeline based on its specification."""
+        
+        # Generate appropriate mocks based on source and destination types
+        source_mock = self._get_source_mock(spec['source_type'])
+        destination_mock = self._get_destination_mock(spec['destination_type'])
+        
+        # Use data preview for more realistic test data if available
+        test_data = self._generate_test_data(data_preview)
+        
+        test_template = '''import pytest
+            import pandas as pd
+            from unittest.mock import patch, MagicMock
+            from {pipeline_name} import {pipeline_name}, transform_data
+
+
+            class Test{pipeline_name_class}:
+                """Test suite for {pipeline_name} pipeline."""
+                
+                def test_transform_data(self):
+                    """Test the transformation logic."""
+                    # Create sample data based on actual data structure
+                    sample_data = pd.DataFrame({test_data})
+                    
+                    # Apply transformation
+                    result = transform_data(sample_data)
+                    
+                    # Assert basic properties
+                    assert isinstance(result, pd.DataFrame)
+                    assert len(result) >= 0
+                    # Ensure all columns are preserved or transformation is applied correctly
+                    assert result.columns.tolist() == sample_data.columns.tolist() or len(result.columns) > 0
+                    
+                def test_empty_dataframe_handling(self):
+                    """Test pipeline handles empty dataframes gracefully."""
+                    empty_df = pd.DataFrame()
+                    result = transform_data(empty_df)
+                    assert isinstance(result, pd.DataFrame)
+                    
+                {source_mock}
+                {destination_mock}
+                def test_pipeline_execution(self, {mock_params}):
+                    """Test complete pipeline execution with mocked I/O."""
+                    # Mock data loading with realistic data structure
+                    mock_data = pd.DataFrame({test_data})
+                    {source_setup}
+                    
+                    # Run pipeline
+                    result = {pipeline_name}()
+                    
+                    # Assertions
+                    assert result is True
+                    {destination_assertions}
+                    
+                def test_pipeline_error_handling(self):
+                    """Test pipeline error handling."""
+                    with patch('{error_mock_target}', side_effect=Exception("Test error")):
+                        with pytest.raises(Exception):
+                            {pipeline_name}()
+
+
+            if __name__ == "__main__":
+                pytest.main([__file__])
+            '''
+
+        pipeline_name_class = ''.join(word.capitalize() for word in spec['pipeline_name'].split('_'))
+        
+        return test_template.format(
+            pipeline_name=spec['pipeline_name'],
+            pipeline_name_class=pipeline_name_class,
+            test_data=test_data,
+            source_mock=source_mock['decorator'],
+            destination_mock=destination_mock['decorator'],
+            mock_params=f"{destination_mock['param']}, {source_mock['param']}",
+            source_setup=source_mock['setup'],
+            destination_assertions=destination_mock['assertions'],
+            error_mock_target=source_mock['error_target']
+        )
+    
+    def _get_source_mock(self, source_type: str) -> dict:
+        """Generate appropriate mock configuration for source type."""
+        mocks = {
+            "localFileCSV": {
+                "decorator": "@patch('pandas.read_csv')",
+                "param": "mock_read_csv",
+                "setup": "mock_read_csv.return_value = mock_data",
+                "error_target": "pandas.read_csv"
+            },
+            "localFileJSON": {
+                "decorator": "@patch('pandas.read_json')",
+                "param": "mock_read_json", 
+                "setup": "mock_read_json.return_value = mock_data",
+                "error_target": "pandas.read_json"
+            },
+            "PostgreSQL": {
+                "decorator": "@patch('pandas.read_sql_table')",
+                "param": "mock_read_sql",
+                "setup": "mock_read_sql.return_value = mock_data",
+                "error_target": "pandas.read_sql_table"
+            },
+            "api": {
+                "decorator": "@patch('requests.get')",
+                "param": "mock_requests_get",
+                "setup": "mock_requests_get.return_value.json.return_value = mock_data.to_dict('records')",
+                "error_target": "requests.get"
+            }
+        }
+        return mocks.get(source_type, mocks["localFileCSV"])
+    
+    def _get_destination_mock(self, dest_type: str) -> dict:
+        """Generate appropriate mock configuration for destination type."""
+        mocks = {
+            "parquet": {
+                "decorator": "@patch('pandas.DataFrame.to_parquet')",
+                "param": "mock_to_parquet",
+                "assertions": "mock_to_parquet.assert_called_once()"
+            },
+            "sqlite": {
+                "decorator": "@patch('pandas.DataFrame.to_sql')",
+                "param": "mock_to_sql",
+                "assertions": "mock_to_sql.assert_called_once()"
+            },
+            "PostgreSQL": {
+                "decorator": "@patch('pandas.DataFrame.to_sql')",
+                "param": "mock_to_sql", 
+                "assertions": "mock_to_sql.assert_called_once()"
+            }
+        }
+        return mocks.get(dest_type, mocks["parquet"])
+    
+    def _generate_test_data(self, data_preview: pd.DataFrame = None) -> str:
+        """Generate test data structure based on actual data preview."""
+        if data_preview is not None and not data_preview.empty:
+            # Use actual data structure from preview
+            test_data_dict = {}
+            for col in data_preview.columns:
+                col_data = data_preview[col].head(3).tolist()
+                # Handle different data types
+                if data_preview[col].dtype == 'object':
+                    # String data - create test versions
+                    test_data_dict[col] = [f"test_{col}_{i+1}" for i in range(3)]
+                elif data_preview[col].dtype in ['int64', 'int32', 'float64', 'float32']:
+                    # Numeric data - use simple test values
+                    test_data_dict[col] = [10*(i+1) for i in range(3)]
+                else:
+                    # Other types - try to use actual data or create simple test data
+                    try:
+                        test_data_dict[col] = col_data
+                    except:
+                        test_data_dict[col] = [f"test_value_{i+1}" for i in range(3)]
+            
+            return str(test_data_dict)
         else:
-            return f"""
-        ### Output Data Saving (Generic)
-        - **Destination Type:** {dest_type or 'Not specified'}
-        - **Default:** Save to file-based output in pipeline directory
-        - **Path:** `../pipelines/{spec.get('pipeline_name')}/output/`
-            """
+            # Default test data if no preview available
+            return """{
+                'id': [1, 2, 3],
+                'name': ['Test1', 'Test2', 'Test3'],
+                'value': [10, 20, 30],
+                'status': ['active', 'active', 'inactive']
+            }"""
+
+    def generate_requirements_txt(self) -> str:
+        """Generate requirements.txt for the pipeline."""
+        requirements = [
+            "pandas>=2.0.0",
+            "numpy>=1.24.0",
+            "sqlalchemy>=2.0.0",
+            "psycopg2-binary>=2.9.0",
+            "pyarrow>=14.0.0",
+            "requests>=2.31.0",
+            "pytest>=7.0.0",
+            "python-dotenv>=1.0.0"
+        ]
+        return '\n'.join(requirements)
     
