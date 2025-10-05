@@ -13,6 +13,7 @@ from app.services.database_service import get_database_service
 from app.utils.json_utils import make_json_serializable
 from .deployment.pipeline_output_service import PipelineOutputService
 import pandas as pd
+import datetime
 
 class PipelineBuilderService:
     def __init__(self):
@@ -29,6 +30,8 @@ class PipelineBuilderService:
         # Add other initializations as needed
 
     def build_pipeline(self, user_input: str) -> dict:
+
+        start_time = datetime.datetime.now()
         # 2. Generate JSON spec
         self.log.info("Generating pipeline specification...")
         spec = self.spec_gen.generate_spec(user_input)
@@ -95,7 +98,12 @@ class PipelineBuilderService:
                 last_error = test_result.get("details")
                 self.log.error("Unit test failed. Retrying pipeline code generation...")
          
-        self.log.info("Pipeline code generation and unit tests completed successfully. After %d attempts.", generate_attempts)
+        temp_message = "Pipeline code generation and unit tests completed successfully. After %d attempts and %d seconds" % (
+            generate_attempts,
+            (datetime.datetime.now() - start_time).seconds
+        )
+
+        self.log.info(temp_message)
 
         # # 8. Deploy
         # deploy_result = self.deploy_pipeline(code)
@@ -111,6 +119,7 @@ class PipelineBuilderService:
             "success": True,
             "spec": spec,
             "code": code,
+            "message": temp_message,
             # "unit_test": test_result,
             # "deployment": deploy_result,
             # "e2e_test": e2e_result
