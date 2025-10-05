@@ -66,10 +66,23 @@ class PipelineCodeGenerator:
 
     def extract_code_block(self, llm_response: str, block_type: str) -> str:
         # Extract code between triple backticks with block_type
-        pattern = rf"```{block_type}(.*?)```"
-        match = re.search(pattern, llm_response, re.DOTALL)
-        if match:
-            return match.group(1).strip()
+        # Handle variations like "requirements.txt", "requirements", "txt", etc.
+        if block_type == "requirements.txt":
+            patterns = [
+                r"```requirements\.txt(.*?)```",
+                r"```requirements(.*?)```", 
+                r"```txt(.*?)```",
+                r"```\s*requirements\.txt\s*(.*?)```"
+            ]
+        else:
+            patterns = [rf"```{block_type}(.*?)```"]
+        
+        for pattern in patterns:
+            match = re.search(pattern, llm_response, re.DOTALL | re.IGNORECASE)
+            if match:
+                result = match.group(1).strip()
+                if result:  # Only return non-empty results
+                    return result
         return ""
     
     def check_requirements(self, requirements: str) -> bool | list:
@@ -96,190 +109,110 @@ class PipelineCodeGenerator:
         input_config = self._generate_input_config(spec)
         output_config = self._generate_output_config(spec)
         
-        prompt_v3 = f"""
-        ## CONTEXT
-        You are an expert Python 3.13 engineer generating production-quality ETL pipeline code.
+        prompt_v3 = f"""Generate Python 3.13 ETL pipeline code.
 
-        **Pipeline Specification:**
-        {safe_json_dumps(spec, indent=2)}
+Pipeline: {safe_json_dumps(spec, indent=2)}
+Data: {safe_json_dumps(data_preview, indent=2)}
 
-        **Data Preview:**
-        {safe_json_dumps(data_preview, indent=2)}
+ALLOWED PACKAGES: {', '.join(ALLOWED_PACKAGES)}
+- Files: ../pipelines/{pipeline_name}/{pipeline_name}.py, requirements.txt, {pipeline_name}_test.py
+- Output: ../pipelines/{pipeline_name}/output/
+- Process ALL data, add 'date' column if missing
+- Use type hints, error handling, proper imports
+- Multiple files: Use glob.glob() for wildcard patterns
+- Multiple outputs: Support both file AND database destinations simultaneously
+- SQLite: Use sqlalchemy, create tables, handle data types
+- Parquet: year/month partitioning or single file if too many dates
 
-        ## CONSTRAINTS
-        - **Python Version:** 3.13 with best practices
-        - **Allowed Packages:** {', '.join(ALLOWED_PACKAGES)}
-        - **Code Quality:** Use type hints, modular structure, and error handling
+{input_config}
+{output_config}
 
-        ## FILE STRUCTURE REQUIREMENTS
-        - **Main Code:** `../pipelines/{pipeline_name}/{pipeline_name}.py`
-        - **Requirements:** `../pipelines/{pipeline_name}/requirements.txt`
-        - **Unit Test:** `../pipelines/{pipeline_name}/{pipeline_name}_test.py`
-        - Ensure this folder exists before writing files
-        - **Output Folder:** All output files must be saved to `../pipelines/{pipeline_name}/output/`
-        
-        ## DATA SOURCE CONFIGURATION
-        {input_config}
-        
-        ## DATA OUTPUT CONFIGURATION
-        {output_config}
+COMPLEX SCENARIOS:
+- Wildcard files (*.csv): Use glob.glob(), read all matching files, concatenate DataFrames
+- Dual outputs (Parquet + SQLite): Write to BOTH destinations in same pipeline
+- SQLite operations: Import sqlalchemy, create engine, define table schema, handle all data types
+- Date partitioning: Extract year/month, use partition_cols=['year','month'] for Parquet
 
-        ## DATA HANDLING REQUIREMENTS
-        ### ETL Processing
-        - **Data Ingestion:** Process ALL available data regardless of records/partitions
-        - **Date Column:** Ensure DataFrame has 'date' column (add today's date if missing)
-        - **Parquet Partitioning:** 
-          - Prefer year/month grouping to avoid system limits
-          - Write without partitioning if too many unique dates
+Tests: pytest with `from {pipeline_name} import ...`
 
-        ## TESTING REQUIREMENTS
-        - **Framework:** pytest
-        - **Import Pattern:** `from {pipeline_name} import ...`
-        - **Coverage:** Test main transformation function for correctness
+MUST return exactly these 3 blocks (requirements.txt cannot be empty and MUST include pytest):
 
-        ## OUTPUT FORMAT
-        Return exactly three code blocks in this order:
-        1. ```python
-        [main pipeline code]
-        ```
-        2. ```requirements.txt
-        [package dependencies]
-        ```
-        3. ```python test
-        [unit test code]
-        ```
+```python
+# Main pipeline code here
+```
 
-        **Important:** Return ONLY the three code blocks. No explanations or extra text.
-        """
+```requirements.txt
+pandas>=2.0.0
+numpy>=1.24.0
+python-dotenv>=1.0.0
+pyarrow>=14.0.0
+pytest>=7.0.0
+sqlalchemy>=2.0.0
+psycopg2-binary>=2.9.0
+```
 
-        # Error handling section
+```python test
+# Test code here using pytest
+```"""
+
         if last_code and last_error:
             prompt_v3 += f"""
-            ## ERROR CORRECTION
-            The previous code execution failed. Please fix the following:
 
-            **Error:**
-            {last_error}
+ERROR CORRECTION - Fix the following error:
+{last_error}
 
-            **Previous Code:**
-            {last_code}
+Previous code: {last_code}
+Previous test: {python_test}
 
-            **Previous Test:**
-            {python_test}
-
-            Fix the issues and regenerate all three code blocks.
-            """
+CRITICAL: requirements.txt MUST include pytest>=7.0.0 for tests and all needed packages from allowed list.
+Regenerate all 3 blocks with proper formatting."""
 
         return prompt_v3
 
     def _generate_input_config(self, spec: dict) -> str:
         """Generate input configuration based on source_type"""
         source_type = spec.get('source_type', '').lower()
+        source_path = spec.get('source_path', 'input_file')
         
         if source_type in ['localfilecsv', 'localfilejson']:
-            return f"""
-        ### Input Data Loading (File-based)
-        ```python
-        from dotenv import load_dotenv
-        import os
-        load_dotenv()
-        DATA_FOLDER = os.getenv('DATA_FOLDER')
-        ```
-        - **Source Type:** {source_type}
-        - **File Path:** Use `DATA_FOLDER` for all input file paths
-        - **Data Validation:** Ensure file exists and format matches source type
-        - **Error Handling:** Handle file not found, encoding issues, and malformed data
-        - **Processing:** Ingest ALL available data regardless of file size
-        - **File Pattern:** `os.path.join(DATA_FOLDER, '{spec.get('source_path', 'input_file')}')`
-            """
+            if '*' in source_path:
+                return f"""Input ({source_type} MULTIPLE): Use glob.glob() with DATA_FOLDER, pattern: {source_path}, combine all files"""
+            else:
+                return f"""Input ({source_type}): Load from DATA_FOLDER env var, path: {source_path}"""
         
         elif source_type == 'postgresql':
-            return f"""
-        ### Input Data Loading (PostgreSQL Database)
-        ```python
-        from dotenv import load_dotenv
-        import os
-        load_dotenv()
-        DATABASE_URL = os.getenv('DATABASE_URL')
-        DATABASE_HOST = os.getenv('DATABASE_HOST')
-        DATABASE_PORT = os.getenv('DATABASE_PORT')
-        DATABASE_NAME = os.getenv('DATABASE_NAME')
-        DATABASE_USER = os.getenv('DATABASE_USER')
-        DATABASE_PASSWORD = os.getenv('DATABASE_PASSWORD')
-        ```
-        - **Source Type:** PostgreSQL Database
-        - **Connection:** Use DATABASE_URL: `{os.getenv('DATABASE_URL', 'postgresql://dataops_user:dataops_password@localhost:5432/dataops_db')}`
-        - **Alternative Connection:** Individual parameters (HOST: {os.getenv('DATABASE_HOST', 'localhost')}, PORT: {os.getenv('DATABASE_PORT', '5432')})
-        - **Authentication:** DATABASE_USER and DATABASE_PASSWORD from environment
-        - **Query:** Extract data from table: `{spec.get('source_table', 'source_table')}`
-        - **Connection Pattern:** Use SQLAlchemy or psycopg2 with proper connection pooling
-        - **Error Handling:** Handle connection failures, timeouts, and SQL errors
-        - **Processing:** Use chunked reading for large datasets with `chunksize` parameter
-            """
+            return f"""Input (PostgreSQL): Use DATABASE_URL env, table: {spec.get('source_table', 'source_table')}, chunked reading"""
         
         else:
-            return f"""
-        ### Input Data Loading (Generic)
-        - **Source Type:** {source_type or 'Not specified'}
-        - **Default:** Use file-based loading with DATA_FOLDER
-        - **Note:** Consider specifying source_type as 'localFileCSV', 'localFileJSON', or 'PostgreSQL'
-            """
+            return f"""Input: File-based with DATA_FOLDER"""
 
     def _generate_output_config(self, spec: dict) -> str:
         """Generate output configuration based on destination_type"""
         dest_type = spec.get('destination_type', '').lower()
+        transformation = spec.get('transformation', '').lower()
         
-        if dest_type in ['localfilecsv', 'localfilejson', 'parquet']:
-            return f"""
-        ### Output Data Saving (File-based)
-        ```python
-        OUTPUT_FOLDER = os.getenv('OUTPUT_FOLDER')
-        output_path = f'../pipelines/{spec.get('pipeline_name')}/output/'
-        ```
-        - **Destination Type:** {dest_type}
-        - **Output Path:** Save to `../pipelines/{spec.get('pipeline_name')}/output/`
-        - **Environment:** Use OUTPUT_FOLDER from .env if available
-        - **File Management:** Ensure output directory exists before writing
-        - **Naming:** Use descriptive filenames with timestamps if needed
-        - **Partitioning:** For Parquet, use year/month grouping to avoid system limits
-        - **File Pattern:** `os.path.join(output_path, '{spec.get('destination_name', 'output_file')}')`
-            """
+        # Check if transformation mentions multiple outputs
+        has_parquet = 'parquet' in transformation
+        has_sqlite = 'sqlite' in transformation or dest_type == 'sqlite'
+        has_postgres = 'postgres' in transformation or dest_type == 'postgresql'
+        
+        if has_parquet and (has_sqlite or has_postgres):
+            db_type = 'SQLite' if has_sqlite else 'PostgreSQL'
+            dest_name = spec.get('destination_name', 'output_table')
+            return f"""Output (DUAL): Save to BOTH Parquet files (partitioned) AND {db_type} table '{dest_name}' - use sqlalchemy for database"""
+        
+        elif dest_type in ['localfilecsv', 'localfilejson', 'parquet']:
+            return f"""Output ({dest_type}): Save to output/ folder, file: {spec.get('destination_name', 'output_file')}"""
+        
+        elif dest_type in ['sqlite', 'sqllite']:
+            destination_name = spec.get('destination_name', spec.get('destination_table', 'output_table'))
+            return f"""Output (SQLite): Use sqlalchemy, create table '{destination_name}', handle all data types properly"""
         
         elif dest_type == 'postgresql':
             destination_name = spec.get('destination_name', spec.get('destination_table', 'output_table'))
-            schema_name = None
-            table_name = destination_name
-            
-            # Extract schema if format is "schema.table"
-            if '.' in destination_name:
-                schema_name, table_name = destination_name.split('.', 1)
-            
-            return f"""
-        ### Output Data Saving (PostgreSQL Database)
-        ```python
-        # Use same database configuration as input
-        DATABASE_URL = os.getenv('DATABASE_URL')
-        ```
-        - **Destination Type:** PostgreSQL Database  
-        - **Connection:** Use same DATABASE_URL and connection parameters as input
-        - **Target Table:** `{destination_name}`
-        - **Schema Management:** 
-          {f"- CREATE SCHEMA IF NOT EXISTS `{schema_name}`" if schema_name else "- Use default schema"}
-          - Create table if not exists with proper column types
-          - Handle schema and table creation before data insertion
-        - **Write Mode:** Handle table creation, updates, or appends as specified
-        - **Data Types:** Ensure proper mapping from DataFrame to SQL types
-        - **Batch Processing:** Use efficient bulk insert methods (`to_sql` with `method='multi'`)
-        - **Transaction Handling:** Use database transactions for data integrity
-        - **Error Handling:** Handle schema/table creation errors gracefully
-        - **Important:** Always create schema first, then table, then insert data
-            """
+            schema_info = f"schema.table: {destination_name}" if '.' in destination_name else f"table: {destination_name}"
+            return f"""Output (PostgreSQL): Use DATABASE_URL, {schema_info}, create schema/table, bulk insert"""
         
         else:
-            return f"""
-        ### Output Data Saving (Generic)
-        - **Destination Type:** {dest_type or 'Not specified'}
-        - **Default:** Save to file-based output in pipeline directory
-        - **Path:** `../pipelines/{spec.get('pipeline_name')}/output/`
-            """
+            return f"""Output: File-based to output/ folder"""
     
