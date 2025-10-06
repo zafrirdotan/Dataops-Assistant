@@ -1,5 +1,6 @@
 import os
 import shutil
+import asyncio
 from typing import Dict
 
 class PipelineOutputService:
@@ -13,7 +14,7 @@ class PipelineOutputService:
         self.template_dir = os.path.dirname(__file__)
         self.env_template_path = os.path.join(self.template_dir, ".env.template")
     
-    def create_pipeline_files(self, pipeline_name: str, code: str, requirements: str, 
+    async def create_pipeline_files(self, pipeline_name: str, code: str, requirements: str, 
                             python_test: str, output_dir="../pipelines") -> str:
         """
         Creates all necessary pipeline files in a dedicated folder.
@@ -28,6 +29,14 @@ class PipelineOutputService:
         Returns:
             str: Path to the created pipeline folder
         """
+        return await asyncio.to_thread(
+            self._create_pipeline_files_sync,
+            pipeline_name, code, requirements, python_test, output_dir
+        )
+    
+    def _create_pipeline_files_sync(self, pipeline_name: str, code: str, requirements: str, 
+                            python_test: str, output_dir="../pipelines") -> str:
+        """Synchronous version for thread pool execution."""
         folder = os.path.abspath(os.path.join(output_dir, pipeline_name))
         os.makedirs(folder, exist_ok=True)
         

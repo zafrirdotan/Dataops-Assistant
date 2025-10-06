@@ -23,8 +23,8 @@ async def main(app: FastAPI):
         # Initialize MinIO service (this will create buckets and load initial data)
         logger.info("MinIO service initialized successfully")
         
-        # Test database connection
-        if database_service.test_connection():
+        # Test database connection asynchronously
+        if await database_service.test_connection():
             logger.info("Database connection established successfully")
         else:
             logger.warning("Database connection test failed")
@@ -53,7 +53,7 @@ def read_root():
     }
 
 @app.get("/health")
-def health_check():
+async def health_check():
     health_status = {
         "status": "healthy", 
         "service": "dataops-assistant",
@@ -65,7 +65,7 @@ def health_check():
     
     # Check database connection
     try:
-        if database_service.test_connection():
+        if await database_service.test_connection():
             health_status["components"]["database"] = "healthy"
         else:
             health_status["components"]["database"] = "unhealthy"

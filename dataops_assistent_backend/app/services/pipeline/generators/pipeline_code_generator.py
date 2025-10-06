@@ -12,7 +12,7 @@ class PipelineCodeGenerator:
     def __init__(self):
         self.llm = LLMService()
 
-    def generate_code(self, spec: dict, data_preview: pd.DataFrame) -> str:
+    async def generate_code(self, spec: dict, data_preview: pd.DataFrame) -> str:
         """
         Generate pipeline code using base template + specific components.
         
@@ -108,19 +108,58 @@ class PipelineCodeGenerator:
     
     def _generate_loader(self, source_type: str, spec: dict) -> str:
         """Return appropriate loader code based on source type."""
-        loaders = {
-            "localFileCSV": f"""
+        # Clean source paths to prevent malformed paths
+        def clean_source_path(path):
+            """Clean source path by removing leading ./ and data/ prefixes"""
+            clean_path = path.lstrip('./')
+            if clean_path.startswith('data/'):
+                clean_path = clean_path[5:]
+            return clean_path if clean_path else 'input.csv'
+        
+        # Check if path contains wildcards
+        source_path = spec.get('source_path', 'input.csv')
+        cleaned_path = clean_source_path(source_path)
+        has_wildcards = '*' in cleaned_path or '?' in cleaned_path
+        
+        if has_wildcards:
+            csv_loader = f"""
+        # Load CSV files using glob pattern
+        import glob
+        data_folder = os.getenv('DATA_FOLDER', '/app/data')
+        pattern_path = os.path.join(data_folder, '{cleaned_path}')
+        print(f"Looking for CSV files matching: {{pattern_path}}")
+        
+        csv_files = glob.glob(pattern_path)
+        if not csv_files:
+            raise FileNotFoundError(f"No CSV files found matching pattern: {{pattern_path}}")
+            
+        print(f"Found {{len(csv_files)}} CSV files: {{csv_files}}")
+        
+        # Read and combine all CSV files
+        dfs = []
+        for csv_file in csv_files:
+            print(f"Loading: {{csv_file}}")
+            df_temp = pd.read_csv(csv_file)
+            dfs.append(df_temp)
+            
+        df = pd.concat(dfs, ignore_index=True)
+        print(f"Loaded {{len(df)}} total rows from {{len(csv_files)}} CSV files")"""
+        else:
+            csv_loader = f"""
         # Load CSV file
         data_folder = os.getenv('DATA_FOLDER', '/app/data')
-        csv_path = os.path.join(data_folder, '{spec.get('source_path', 'input.csv')}')
+        csv_path = os.path.join(data_folder, '{cleaned_path}')
         print(f"Loading CSV from: {{csv_path}}")
         df = pd.read_csv(csv_path)
-        print(f"Loaded {{len(df)}} rows from CSV file")""",
+        print(f"Loaded {{len(df)}} rows from CSV file")"""
+        
+        loaders = {
+            "localFileCSV": csv_loader,
             
             "localFileJSON": f"""
         # Load JSON file
         data_folder = os.getenv('DATA_FOLDER', '/app/data')
-        json_path = os.path.join(data_folder, '{spec.get('source_path', 'input.json')}')
+        json_path = os.path.join(data_folder, '{clean_source_path(spec.get('source_path', 'input.json'))}')
         print(f"Loading JSON from: {{json_path}}")
         df = pd.read_json(json_path)
         print(f"Loaded {{len(df)}} rows from JSON file")""",
@@ -272,6 +311,7 @@ class PipelineCodeGenerator:
         return '''import pandas as pd
 from sqlalchemy import create_engine, text, MetaData, Table, Column, Integer, String, Float, DateTime, Boolean
 import os
+import glob
 from datetime import datetime
 
 
@@ -351,7 +391,7 @@ if __name__ == "__main__":
     {function_name}()
 '''
 
-    def generate_test_code(self, spec: dict, data_preview: pd.DataFrame = None) -> str:
+    async def generate_test_code(self, spec: dict, data_preview: pd.DataFrame = None) -> str:
         """Generate comprehensive test code for the pipeline based on its specification."""
         
         # Generate appropriate mocks based on source and destination types
@@ -362,59 +402,59 @@ if __name__ == "__main__":
         test_data = self._generate_test_data(data_preview)
         
         test_template = '''import pytest
-            import pandas as pd
-            from unittest.mock import patch, MagicMock
-            from {pipeline_name} import {pipeline_name}, transform_data
+import pandas as pd
+from unittest.mock import patch, MagicMock
+from {pipeline_name} import {pipeline_name}, transform_data
 
 
-            class Test{pipeline_name_class}:
-                """Test suite for {pipeline_name} pipeline."""
-                
-                def test_transform_data(self):
-                    """Test the transformation logic."""
-                    # Create sample data based on actual data structure
-                    sample_data = pd.DataFrame({test_data})
-                    
-                    # Apply transformation
-                    result = transform_data(sample_data)
-                    
-                    # Assert basic properties
-                    assert isinstance(result, pd.DataFrame)
-                    assert len(result) >= 0
-                    # Ensure all columns are preserved or transformation is applied correctly
-                    assert result.columns.tolist() == sample_data.columns.tolist() or len(result.columns) > 0
-                    
-                def test_empty_dataframe_handling(self):
-                    """Test pipeline handles empty dataframes gracefully."""
-                    empty_df = pd.DataFrame()
-                    result = transform_data(empty_df)
-                    assert isinstance(result, pd.DataFrame)
-                    
-                {source_mock}
-                {destination_mock}
-                def test_pipeline_execution(self, {mock_params}):
-                    """Test complete pipeline execution with mocked I/O."""
-                    # Mock data loading with realistic data structure
-                    mock_data = pd.DataFrame({test_data})
-                    {source_setup}
-                    
-                    # Run pipeline
-                    result = {pipeline_name}()
-                    
-                    # Assertions
-                    assert result is True
-                    {destination_assertions}
-                    
-                def test_pipeline_error_handling(self):
-                    """Test pipeline error handling."""
-                    with patch('{error_mock_target}', side_effect=Exception("Test error")):
-                        with pytest.raises(Exception):
-                            {pipeline_name}()
+class Test{pipeline_name_class}:
+    """Test suite for {pipeline_name} pipeline."""
+    
+    def test_transform_data(self):
+        """Test the transformation logic."""
+        # Create sample data based on actual data structure
+        sample_data = pd.DataFrame({test_data})
+        
+        # Apply transformation
+        result = transform_data(sample_data)
+        
+        # Assert basic properties
+        assert isinstance(result, pd.DataFrame)
+        assert len(result) >= 0
+        # Ensure all columns are preserved or transformation is applied correctly
+        assert result.columns.tolist() == sample_data.columns.tolist() or len(result.columns) > 0
+        
+    def test_empty_dataframe_handling(self):
+        """Test pipeline handles empty dataframes gracefully."""
+        empty_df = pd.DataFrame()
+        result = transform_data(empty_df)
+        assert isinstance(result, pd.DataFrame)
+        
+    {source_mock}
+    {destination_mock}
+    def test_pipeline_execution(self, {mock_params}):
+        """Test complete pipeline execution with mocked I/O."""
+        # Mock data loading with realistic data structure
+        mock_data = pd.DataFrame({test_data})
+        {source_setup}
+        
+        # Run pipeline
+        result = {pipeline_name}()
+        
+        # Assertions
+        assert result is True
+        {destination_assertions}
+        
+    def test_pipeline_error_handling(self):
+        """Test pipeline error handling."""
+        with patch('{error_mock_target}', side_effect=Exception("Test error")):
+            with pytest.raises(Exception):
+                {pipeline_name}()
 
 
-            if __name__ == "__main__":
-                pytest.main([__file__])
-            '''
+if __name__ == "__main__":
+    pytest.main([__file__])
+'''
 
         pipeline_name_class = ''.join(word.capitalize() for word in spec['pipeline_name'].split('_'))
         
@@ -490,8 +530,17 @@ if __name__ == "__main__":
                 col_data = data_preview[col].head(3).tolist()
                 # Handle different data types
                 if data_preview[col].dtype == 'object':
-                    # String data - create test versions
-                    test_data_dict[col] = [f"test_{col}_{i+1}" for i in range(3)]
+                    # Check if it's a date/time column based on column name
+                    col_lower = col.lower()
+                    if 'date' in col_lower:
+                        # Generate realistic date strings
+                        test_data_dict[col] = ['2023-01-01', '2023-01-02', '2023-01-03']
+                    elif 'time' in col_lower:
+                        # Generate realistic time strings
+                        test_data_dict[col] = ['10:30:00', '14:15:30', '18:45:15']
+                    else:
+                        # String data - create test versions
+                        test_data_dict[col] = [f"test_{col}_{i+1}" for i in range(3)]
                 elif data_preview[col].dtype in ['int64', 'int32', 'float64', 'float32']:
                     # Numeric data - use simple test values
                     test_data_dict[col] = [10*(i+1) for i in range(3)]

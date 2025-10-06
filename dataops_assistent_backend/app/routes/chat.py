@@ -13,13 +13,13 @@ prompt_guard_service = PromptGuardService()
 class ChatRequest(BaseModel):
     message: str
 
-@router.post("")
+@router.post("/")
 async def chat_endpoint(request: ChatRequest):
     """
     Endpoint to handle chat requests.
     Delegates business logic to ChatService.
     """
-    result = chat_service.process_message(request.message)
+    result = await chat_service.process_message(request.message)
 
     if result["decision"] == "block":
         raise HTTPException(status_code=400, detail=result)

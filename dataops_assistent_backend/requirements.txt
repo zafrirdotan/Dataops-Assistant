@@ -16,3 +16,5 @@ pytest-cov
 psycopg2-binary
 sqlalchemy
 alembic
+# Async PostgreSQL dependencies
+asyncpg

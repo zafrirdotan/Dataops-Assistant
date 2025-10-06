@@ -1,6 +1,7 @@
 import os
 import subprocess
 import sys
+import asyncio
 from ..deployment.pipeline_output_service import PipelineOutputService
 
 class PipelineTestService:
@@ -13,7 +14,7 @@ class PipelineTestService:
         self.log = log
         self.output_service = PipelineOutputService()
 
-    def run_pipeline_test(self, folder: str, pipeline_name: str, execution_mode="venv") -> dict:
+    async def run_pipeline_test(self, folder: str, pipeline_name: str, execution_mode="venv") -> dict:
         """
         Runs tests for a pipeline in the specified folder.
         
@@ -30,13 +31,13 @@ class PipelineTestService:
         paths = self.output_service.get_pipeline_paths(folder, pipeline_name)
         
         if execution_mode == "venv":
-            return self._run_venv_test(folder, pipeline_name, paths)
+            return await self._run_venv_test(folder, pipeline_name, paths)
         elif execution_mode == "docker":
-            return self._run_docker_test(folder, pipeline_name, paths)
+            return await self._run_docker_test(folder, pipeline_name, paths)
         else:
             return {"success": False, "details": "Unknown execution mode."}
 
-    def _run_venv_test(self, folder: str, pipeline_name: str, paths: dict) -> dict:
+    async def _run_venv_test(self, folder: str, pipeline_name: str, paths: dict) -> dict:
         """
         Runs tests using virtual environment.
         
@@ -50,30 +51,50 @@ class PipelineTestService:
         """
         try: 
             venv_path = os.path.join(folder, "venv")
-            subprocess.run([sys.executable, "-m", "venv", venv_path], check=True)
+            # Create virtual environment and wait for completion
+            process = await asyncio.create_subprocess_exec(
+                sys.executable, "-m", "venv", venv_path
+            )
+            await process.wait()
             
+            # Use appropriate paths for Linux containers
             pip_path = os.path.join(venv_path, "bin", "pip")
             python_path = os.path.join(venv_path, "bin", "python")
             
+            # Verify the virtual environment was created successfully
+            if not os.path.exists(pip_path):
+                self.log.error(f"Virtual environment creation failed. Pip not found at: {pip_path}")
+                return {"success": False, "details": f"Virtual environment creation failed. Pip not found at: {pip_path}"}
+            
             # Install requirements
-            subprocess.run([pip_path, "install", "-r", paths["requirements"]], check=True)
+            process = await asyncio.create_subprocess_exec(
+                pip_path, "install", "-r", paths["requirements"]
+            )
+            await process.wait()
             
             # Run main pipeline
-            result = subprocess.run([python_path, paths["code"]], capture_output=True, text=True, cwd=folder)
-            self.log.info(f"Pipeline test completed for {pipeline_name} with return code {result.returncode}.")
+            process = await asyncio.create_subprocess_exec(
+                python_path, paths["code"],
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                cwd=folder
+            )
+            stdout, stderr = await process.communicate()
             
-            if result.returncode != 0:
-                self.log.error(f"Pipeline test failed for {pipeline_name} with error: {result.stderr}")
-                return {"success": False, "details": result.stderr}
+            self.log.info(f"Pipeline test completed for {pipeline_name} with return code {process.returncode}.")
+            
+            if process.returncode != 0:
+                self.log.error(f"Pipeline test failed for {pipeline_name} with error: {stderr.decode()}")
+                return {"success": False, "details": stderr.decode()}
             
             # Run unit tests
-            return self._run_unit_tests(python_path, paths["test"], folder, pipeline_name)
+            return await self._run_unit_tests(python_path, paths["test"], folder, pipeline_name)
             
         except Exception as e:
             self.log.error(f"Error occurred while running pipeline test: {e}")
             return {"success": False, "details": str(e)}
 
-    def _run_docker_test(self, folder: str, pipeline_name: str, paths: dict) -> dict:
+    async def _run_docker_test(self, folder: str, pipeline_name: str, paths: dict) -> dict:
         """
         Runs tests using Docker.
         
@@ -89,18 +110,29 @@ class PipelineTestService:
             self.output_service.create_dockerfile(folder, pipeline_name)
             image_tag = f"{pipeline_name}_test_image"
             
-            subprocess.run(["docker", "build", "-t", image_tag, folder], check=True)
-            result = subprocess.run(["docker", "run", "--rm", image_tag], capture_output=True, text=True)
+            # Build docker image
+            process = await asyncio.create_subprocess_exec(
+                "docker", "build", "-t", image_tag, folder
+            )
+            await process.wait()
+            
+            # Run docker container
+            process = await asyncio.create_subprocess_exec(
+                "docker", "run", "--rm", image_tag,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
+            )
+            stdout, stderr = await process.communicate()
             
             return {
-                "success": result.returncode == 0,
-                "stdout": result.stdout,
-                "stderr": result.stderr
+                "success": process.returncode == 0,
+                "stdout": stdout.decode(),
+                "stderr": stderr.decode()
             }
         except Exception as e:
             return {"success": False, "details": str(e)}
 
-    def _run_unit_tests(self, python_path: str, test_path: str, folder: str, pipeline_name: str) -> dict:
+    async def _run_unit_tests(self, python_path: str, test_path: str, folder: str, pipeline_name: str) -> dict:
         """
         Runs unit tests using pytest.
         
@@ -114,25 +146,26 @@ class PipelineTestService:
             dict: Test result with success status and details
         """
         try:
-            test_result = subprocess.run(
-                [python_path, "-m", "pytest", test_path],
-                capture_output=True,
-                text=True,
+            process = await asyncio.create_subprocess_exec(
+                python_path, "-m", "pytest", test_path,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
                 cwd=folder
             )
+            stdout, stderr = await process.communicate()
             
-            if test_result.returncode != 0:
-                self.log.error(f"Unit test failed for {pipeline_name} with error: {test_result.stderr} and stdout: {test_result.stdout}")
+            if process.returncode != 0:
+                self.log.error(f"Unit test failed for {pipeline_name} with error: {stderr.decode()} and stdout: {stdout.decode()}")
                 return {
                     "success": False, 
-                    "details": f"Unit test failed with error: {test_result.stderr}, stdout: {test_result.stdout}"
+                    "details": f"Unit test failed with error: {stderr.decode()}, stdout: {stdout.decode()}"
                 }
 
-            self.log.info(f"Unit test executed successfully for {pipeline_name} with output: {test_result.stdout}")
+            self.log.info(f"Unit test executed successfully for {pipeline_name} with output: {stdout.decode()}")
             return {
                 "success": True, 
                 "details": "Unit test executed successfully.", 
-                "stdout": test_result.stdout
+                "stdout": stdout.decode()
             }
         except Exception as e:
             self.log.error(f"Unit test failed for {pipeline_name} with exception: {e}")

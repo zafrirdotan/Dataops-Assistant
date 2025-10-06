@@ -8,7 +8,7 @@ class ChatService:
         self.prompt_guard_service = PromptGuardService()
         self.pipeline_builder_service = PipelineBuilderService()
 
-    def process_message(self, raw_message: str) -> dict:
+    async def process_message(self, raw_message: str) -> dict:
         """
         Process the user message, validate it, and get a response from the LLM.
         """
@@ -37,7 +37,7 @@ class ChatService:
                 }
 
         # Step 2: Generate pipeline 
-        build_result = self.pipeline_builder_service.build_pipeline_with_templates(analysis["cleaned"])
+        build_result = await self.pipeline_builder_service.build_pipeline_with_templates(analysis["cleaned"])
 
         # Step 4: Sanitize the LLM response for display
         # sanitized_response = self.prompt_guard_service.sanitize_for_display(llm_response)

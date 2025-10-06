@@ -51,7 +51,7 @@ class PipelineSpecGenerator:
     def __init__(self):
         self.llm = LLMService()
 
-    def generate_spec(self, user_input: str) -> dict:
+    async def generate_spec(self, user_input: str) -> dict:
         """
         Generate a pipeline specification from user input.
         Now focuses on configuration extraction rather than full code generation.
@@ -80,7 +80,7 @@ class PipelineSpecGenerator:
             - For file sources without explicit paths, suggest reasonable defaults like 'data/input.csv'
             """
             
-            response = self.llm.response_create(
+            response = await self.llm.response_create_async(
                 model = "gpt-4.1",
                 input = prompt,
                 temperature = 0,
