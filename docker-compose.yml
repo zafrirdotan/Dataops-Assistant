@@ -9,6 +9,7 @@ services:
     depends_on:
       - minio
       - postgres
+      - data-loader
     env_file:
       - .env
     environment:
@@ -22,6 +23,30 @@ services:
       - ./data:/app/data
         # TODO: REMOVE FOR PRODUCTION - Development volume mount for hot-reload
       - ./dataops_assistent_backend:/app
+
+  data-loader:
+    build: ./data-loader-service
+    restart: "no" # Run once and stop
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_started
+    environment:
+      - DATABASE_HOST=postgres
+      - DATABASE_PORT=5432
+      - DATABASE_NAME=dataops_db
+      - DATABASE_USER=dataops_user
+      - DATABASE_PASSWORD=dataops_password
+      - MINIO_HOST=minio
+      - MINIO_PORT=9000
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin
+      - MINIO_SECURE=false
+      - CSV_DATA_PATH=/data
+      - DATA_DIRECTORY=/data
+    volumes:
+      - ./data:/data
 
   minio:
     image: minio/minio:latest
