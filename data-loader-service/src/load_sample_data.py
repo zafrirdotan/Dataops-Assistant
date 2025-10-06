@@ -17,18 +17,36 @@ logger = logging.getLogger(__name__)
 def load_sample_data():
     """Load sample bank transactions data into PostgreSQL."""
     
-    # Database connection
-    DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://dataops_user:dataops_password@localhost:5432/dataops_db")
+    # Database connection - updated for data-loader-service environment
+    DATABASE_URL = os.getenv("DATABASE_URL", 
+                            f"postgresql://{os.getenv('DATABASE_USER', 'dataops_user')}:"
+                            f"{os.getenv('DATABASE_PASSWORD', 'dataops_password')}@"
+                            f"{os.getenv('DATABASE_HOST', 'localhost')}:"
+                            f"{os.getenv('DATABASE_PORT', '5432')}/"
+                            f"{os.getenv('DATABASE_NAME', 'dataops_db')}")
     
     try:
         # Create SQLAlchemy engine
         engine = create_engine(DATABASE_URL)
         
-        # Read CSV data
-        csv_path = "/app/data/bank_transactions.csv"
+        # Read CSV data - updated paths for data-loader-service
+        csv_data_dir = os.getenv('CSV_DATA_PATH', '/data')
+        csv_path = os.path.join(csv_data_dir, 'bank_transactions.csv')
+        
         if not os.path.exists(csv_path):
-            # Try relative path if absolute doesn't work
-            csv_path = "../data/bank_transactions.csv"
+            # Try alternative paths
+            alternative_paths = [
+                "/data/bank_transactions.csv",
+                "../data/bank_transactions.csv",
+                "../../data/bank_transactions.csv",
+                "/app/data/bank_transactions.csv"
+            ]
+            for alt_path in alternative_paths:
+                if os.path.exists(alt_path):
+                    csv_path = alt_path
+                    break
+            else:
+                raise FileNotFoundError(f"Could not find bank_transactions.csv in any expected location. Searched: {alternative_paths}")
         
         logger.info(f"Reading CSV data from: {csv_path}")
         df = pd.read_csv(csv_path)

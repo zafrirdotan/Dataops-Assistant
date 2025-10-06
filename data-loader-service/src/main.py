@@ -3,6 +3,7 @@ import sys
 import logging
 from data_loader import DataLoaderManager
 from config.settings import get_settings
+from load_sample_data import load_sample_data
 
 # Configure logging
 logging.basicConfig(
@@ -15,6 +16,13 @@ def main():
     """Main entry point for data initialization"""
     try:
         logger.info("Starting data loader service...")
+        
+        # Check if we should load sample data
+        load_samples = os.getenv('LOAD_SAMPLE_DATA', 'false').lower() == 'true'
+        
+        if load_samples:
+            logger.info("Loading sample data...")
+            load_sample_data()
         
         # Load configuration
         settings = get_settings()

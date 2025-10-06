@@ -45,6 +45,7 @@ services:
       - MINIO_SECURE=false
       - CSV_DATA_PATH=/data
       - DATA_DIRECTORY=/data
+      - LOAD_SAMPLE_DATA=true
     volumes:
       - ./data:/data
 
