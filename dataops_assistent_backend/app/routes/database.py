@@ -12,10 +12,10 @@ router = APIRouter()
 
 
 @router.get("/test-connection")
-def test_database_connection(db_service: DatabaseService = Depends(get_database_service)):
+async def test_database_connection(db_service: DatabaseService = Depends(get_database_service)):
     """Test database connection."""
     try:
-        is_connected = db_service.test_connection()
+        is_connected = await db_service.test_connection()
         return {
             "database_connected": is_connected,
             "message": "Database connection successful" if is_connected else "Database connection failed"
@@ -26,10 +26,12 @@ def test_database_connection(db_service: DatabaseService = Depends(get_database_
 
 
 @router.get("/pipelines")
-def get_pipelines(db_service: DatabaseService = Depends(get_database_service)):
+async def get_pipelines(db_service: DatabaseService = Depends(get_database_service)):
     """Get all pipelines from the database."""
     try:
-        pipelines = db_service.fetch_all("SELECT * FROM pipelines ORDER BY created_at DESC")
+        pipelines = await db_service.fetch_all(
+            "SELECT id, name, description, spec, code, status, created_at, updated_at FROM pipelines ORDER BY created_at DESC"
+        )
         
         # Convert to list of dictionaries
         pipeline_list = []
@@ -56,10 +58,10 @@ def get_pipelines(db_service: DatabaseService = Depends(get_database_service)):
 
 
 @router.get("/pipelines/{pipeline_id}")
-def get_pipeline(pipeline_id: int, db_service: DatabaseService = Depends(get_database_service)):
+async def get_pipeline(pipeline_id: int, db_service: DatabaseService = Depends(get_database_service)):
     """Get a specific pipeline by ID."""
     try:
-        pipeline = db_service.fetch_one(
+        pipeline = await db_service.fetch_one_async(
             "SELECT * FROM pipelines WHERE id = :pipeline_id",
             {"pipeline_id": pipeline_id}
         )
@@ -87,7 +89,7 @@ def get_pipeline(pipeline_id: int, db_service: DatabaseService = Depends(get_dat
 
 
 @router.get("/chat-history")
-def get_chat_history(
+async def get_chat_history(
     session_id: str = None, 
     limit: int = 50,
     db_service: DatabaseService = Depends(get_database_service)
@@ -110,11 +112,11 @@ def get_chat_history(
             """
             params = {"limit": limit}
         
-        chat_entries = db_service.fetch_all(query, params)
+        chat_messages = await db_service.fetch_all(query, params)
         
         # Convert to list of dictionaries
         chat_list = []
-        for entry in chat_entries:
+        for entry in chat_messages:
             chat_dict = {
                 "id": entry[0],
                 "session_id": entry[1],
@@ -135,7 +137,7 @@ def get_chat_history(
 
 
 @router.get("/bank-transactions")
-def get_bank_transactions(
+async def get_bank_transactions(
     limit: int = 100,
     offset: int = 0,
     user_id: int = None,
@@ -180,7 +182,7 @@ def get_bank_transactions(
             LIMIT :limit OFFSET :offset
         """
         
-        transactions = db_service.fetch_all(query, params)
+        transactions = await db_service.fetch_all(query, params)
         
         # Convert to list of dictionaries
         transaction_list = []
@@ -207,7 +209,7 @@ def get_bank_transactions(
         
         # Get total count for pagination
         count_query = f"SELECT COUNT(*) FROM bank_transactions WHERE {where_clause}"
-        total_count = db_service.fetch_one(count_query, {k: v for k, v in params.items() if k not in ['limit', 'offset']})[0]
+        total_count = (await db_service.fetch_one_async(count_query, {k: v for k, v in params.items() if k not in ['limit', 'offset']}))[0]
         
         return {
             "transactions": transaction_list,
@@ -228,7 +230,7 @@ def get_bank_transactions(
 
 
 @router.get("/bank-transactions/stats")
-def get_bank_transaction_stats(db_service: DatabaseService = Depends(get_database_service)):
+async def get_bank_transaction_stats(db_service: DatabaseService = Depends(get_database_service)):
     """Get bank transaction statistics."""
     try:
         stats_query = """
@@ -247,7 +249,7 @@ def get_bank_transaction_stats(db_service: DatabaseService = Depends(get_databas
             FROM bank_transactions
         """
         
-        stats = db_service.fetch_one(stats_query)
+        stats = await db_service.fetch_one_async(stats_query)
         
         # Get top merchants
         merchant_query = """
@@ -257,7 +259,7 @@ def get_bank_transaction_stats(db_service: DatabaseService = Depends(get_databas
             ORDER BY transaction_count DESC 
             LIMIT 10
         """
-        top_merchants = db_service.fetch_all(merchant_query)
+        top_merchants = await db_service.fetch_all(merchant_query)
         
         # Get category breakdown
         category_query = """
@@ -266,7 +268,7 @@ def get_bank_transaction_stats(db_service: DatabaseService = Depends(get_databas
             GROUP BY category 
             ORDER BY transaction_count DESC
         """
-        categories = db_service.fetch_all(category_query)
+        categories = await db_service.fetch_all(category_query)
         
         return {
             "overall_stats": {

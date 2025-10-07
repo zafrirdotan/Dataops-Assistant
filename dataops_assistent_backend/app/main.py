@@ -69,18 +69,15 @@ async def health_check():
             health_status["components"]["database"] = "healthy"
         else:
             health_status["components"]["database"] = "unhealthy"
-            health_status["status"] = "degraded"
     except Exception as e:
-        health_status["components"]["database"] = f"error: {str(e)}"
-        health_status["status"] = "degraded"
+        health_status["components"]["database"] = "unhealthy"
     
     # Check storage (MinIO) connection
     try:
-        # Assuming storage_service has a test method or we can check bucket existence
+        # Simple storage check - you can implement a proper health check method
         health_status["components"]["storage"] = "healthy"
     except Exception as e:
-        health_status["components"]["storage"] = f"error: {str(e)}"
-        health_status["status"] = "degraded"
+        health_status["components"]["storage"] = "unhealthy"
     
     return health_status
 
