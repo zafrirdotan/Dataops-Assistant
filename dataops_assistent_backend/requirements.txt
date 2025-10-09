@@ -17,4 +17,6 @@ psycopg2-binary
 sqlalchemy
 alembic
 # Async PostgreSQL dependencies
-asyncpg
+asyncpg>=0.29.0
+# Async file operations
+aiofiles>=23.0.0

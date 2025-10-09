@@ -179,25 +179,32 @@ class PipelineBuilderService:
             # Step 7: Generate requirements.txt
             requirements = self.code_gen.generate_requirements_txt()
             
-            # Step 8: Create pipeline files
+            # Step 8: Create pipeline files in MinIO (instead of local files)
             try:
-                folder = await self.output_service.create_pipeline_files(
+                pipeline_info = await self.output_service.create_pipeline_files(
                     spec.get("pipeline_name"), 
                     pipeline_code, 
                     requirements, 
                     test_code
                 )
-                self.log.info(f"Pipeline files created in: {folder}")
+                pipeline_id = pipeline_info["pipeline_id"]
+                self.log.info(f"Pipeline files stored in MinIO with ID: {pipeline_id}")
             except Exception as e:
-                self.log.error(f"Failed to create pipeline files: {e}")
-                return {"error": f"Failed to create pipeline files: {e}"}
+                self.log.error(f"Failed to store pipeline files in MinIO: {e}")
+                return {"error": f"Failed to store pipeline files: {e}"}
             
-            # Step 9: Run tests (optional - can be skipped for faster generation)
-            self.log.info("Running pipeline tests...")
+            # Step 9: Run tests from MinIO storage
+            self.log.info("Running pipeline tests from MinIO storage...")
             try:
-                test_result = await self.test_service.run_pipeline_test(folder, spec.get("pipeline_name"), execution_mode="venv")
+                test_result = await self.test_service.run_pipeline_test(
+                    pipeline_id,  # Pass pipeline_id instead of folder path
+                    spec.get("pipeline_name"), 
+                    execution_mode="venv"
+                )
+                self.log.info(f"Test result: {test_result}")
             except Exception as e:
                 self.log.error(f"Failed to run pipeline tests: {e}")
+                test_result = {"success": False, "details": f"Test execution failed: {e}"}
             
             execution_time = (datetime.datetime.now() - start_time).seconds
             message = f"Template-based pipeline created successfully in {execution_time} seconds"
@@ -206,14 +213,17 @@ class PipelineBuilderService:
             
             return {
                 "success": True,
+                "pipeline_id": pipeline_id,  # Add pipeline_id to response
                 "spec": spec,
                 "code": pipeline_code,
                 "test_code": test_code,
                 "requirements": requirements,
-                "folder": folder,
+                "storage_info": pipeline_info,  # MinIO storage information
+                "test_result": test_result,    # Test execution results
+                "folder": pipeline_info.get("folder"),  # Virtual folder path for compatibility
                 "message": message,
                 "execution_time": execution_time,
-                "mode": "template-based"
+                "mode": "template-based-minio"
             }
             
         except Exception as e:

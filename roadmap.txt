@@ -1,0 +1,48 @@
+
+🚀 DataOps Assistant Enhancement Roadmap
+
+✅ COMPLETED
+- App is now fully async: All routes converted, supports 10–20+ concurrent requests
+
+🎯 REMAINING GOALS
+
+2️⃣ MinIO Integration
+    - Store pipeline artifacts (code, specs, results) in MinIO buckets
+    - Add endpoints for artifact retrieval
+    - Implement versioning for pipeline files
+
+3️⃣ Enhanced Dockerization
+    - Multi-stage Docker builds for improved performance
+    - Add health checks & monitoring
+    - Production-ready container configuration
+    - Resource limits & security hardening
+
+4️⃣ Airflow Integration
+    - Generate Airflow DAGs from chat requests
+    - Auto-deploy DAGs when scheduling is requested
+    - Integrate Airflow API for pipeline monitoring
+    - Create scheduling interface in chat
+
+📋 Additional Suggestions
+
+Performance & Monitoring
+    - Request rate limiting
+    - Redis caching for frequent queries
+    - Async request logging middleware
+    - Performance monitoring dashboards
+
+Advanced Features
+    - WebSocket support for real-time pipeline updates
+    - Background task processing for long operations
+    - Pipeline artifact management via MinIO
+    - Enhanced error handling & retry mechanisms
+
+Production Readiness
+    - Load testing to determine concurrent limits
+    - Database connection pool optimization
+    - Security enhancements (authentication, authorization)
+    - API documentation improvements
+
+🔝 Priority Order: MinIO → Enhanced Docker → Airflow → Performance Monitoring
+
+Which area would you like to focus on first?

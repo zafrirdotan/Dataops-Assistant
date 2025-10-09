@@ -1,6 +1,6 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
-from app.routes import chat, data, database
+from app.routes import chat, data, database, storage
 from app.services.storage_service import MinioStorage
 from app.services.database_service import get_database_service
 import logging
@@ -20,8 +20,9 @@ async def main(app: FastAPI):
     # Startup
     logger.info("Starting DataOps Assistant API...")
     try:
-        # Initialize MinIO service (this will create buckets and load initial data)
-        logger.info("MinIO service initialized successfully")
+        # Initialize MinIO service and buckets
+        await storage_service.initialize_pipeline_buckets()
+        logger.info("MinIO service and pipeline buckets initialized successfully")
         
         # Test database connection asynchronously
         if await database_service.test_connection():
@@ -74,8 +75,11 @@ async def health_check():
     
     # Check storage (MinIO) connection
     try:
-        # Simple storage check - you can implement a proper health check method
-        health_status["components"]["storage"] = "healthy"
+        storage_status = await storage_service.get_storage_status()
+        if storage_status.get("status") == "connected":
+            health_status["components"]["storage"] = "healthy"
+        else:
+            health_status["components"]["storage"] = "unhealthy"
     except Exception as e:
         health_status["components"]["storage"] = "unhealthy"
     
@@ -84,3 +88,4 @@ async def health_check():
 # Include routers
 app.include_router(chat.router, prefix="/chat", tags=["chat"])
 app.include_router(database.router, prefix="/database", tags=["database"])
+app.include_router(storage.router)  # Storage router already has /storage prefix

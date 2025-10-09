@@ -1,38 +1,80 @@
 import os
 import shutil
 import asyncio
-from typing import Dict
+import logging
+import datetime
+import uuid
+from typing import Dict, Any
+from app.services.storage_service import MinioStorage
 
 class PipelineOutputService:
     """
     Service responsible for creating and managing pipeline output files.
-    Extracted from TestPipelineService to separate concerns.
+    Now stores files directly in MinIO instead of local filesystem.
     """
     
     def __init__(self):
-        # Get the path to the .env template in the same directory as this service
+        self.log = logging.getLogger(__name__)
+        self.storage_service = MinioStorage()
+        # Keep template dir for backward compatibility
         self.template_dir = os.path.dirname(__file__)
         self.env_template_path = os.path.join(self.template_dir, ".env.template")
     
     async def create_pipeline_files(self, pipeline_name: str, code: str, requirements: str, 
-                            python_test: str, output_dir="../pipelines") -> str:
+                            python_test: str, output_dir="../pipelines") -> Dict[str, Any]:
         """
-        Creates all necessary pipeline files in a dedicated folder.
+        Creates pipeline files and stores them directly in MinIO instead of local filesystem.
         
         Args:
             pipeline_name: Name of the pipeline
             code: Python code for the pipeline
             requirements: Requirements.txt content
             python_test: Test code for the pipeline
-            output_dir: Base directory for pipeline outputs
+            output_dir: Base directory (ignored, kept for compatibility)
             
         Returns:
-            str: Path to the created pipeline folder
+            Dict[str, Any]: Pipeline metadata including MinIO storage locations
         """
-        return await asyncio.to_thread(
-            self._create_pipeline_files_sync,
-            pipeline_name, code, requirements, python_test, output_dir
-        )
+        try:
+            # Generate unique pipeline ID
+            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            unique_id = str(uuid.uuid4())[:8]
+            pipeline_id = f"{pipeline_name}_{timestamp}_{unique_id}"
+            
+            self.log.info(f"Creating pipeline files for: {pipeline_id}")
+            
+            # Initialize MinIO buckets if needed
+            await self.storage_service.initialize_pipeline_buckets()
+            
+            # Prepare pipeline data for MinIO storage
+            pipeline_data = {
+                "code": code,
+                "test_code": python_test,
+                "requirements": requirements,
+                "user_input": f"Pipeline: {pipeline_name}",
+                "created_at": datetime.datetime.now().isoformat(),
+                "mode": "template-based-minio"
+            }
+            
+            # Store pipeline directly in MinIO
+            self.log.info(f"Storing pipeline {pipeline_id} in MinIO...")
+            stored_files = await self.storage_service.store_pipeline(pipeline_id, pipeline_data)
+            
+            self.log.info(f"Pipeline {pipeline_id} stored successfully in MinIO")
+            
+            # Return pipeline metadata (compatible with old interface)
+            return {
+                "success": True,
+                "pipeline_id": pipeline_id,
+                "storage_location": "MinIO",
+                "stored_files": stored_files,
+                "folder": f"minio://pipelines/{pipeline_id}",  # Virtual folder path for compatibility
+                "timestamp": timestamp
+            }
+            
+        except Exception as e:
+            self.log.error(f"Failed to create pipeline files in MinIO: {e}")
+            raise Exception(f"Pipeline file creation failed: {e}")
     
     def _create_pipeline_files_sync(self, pipeline_name: str, code: str, requirements: str, 
                             python_test: str, output_dir="../pipelines") -> str:
@@ -109,13 +151,24 @@ CMD ["python", "{pipeline_name}.py"]
             "dockerfile": os.path.join(folder, "Dockerfile")
         }
     
+    async def create_pipeline_files_local(self, pipeline_name: str, code: str, requirements: str, 
+                            python_test: str, output_dir="../pipelines") -> str:
+        """
+        Legacy method for local file creation (kept for backward compatibility)
+        """
+        return await asyncio.to_thread(
+            self._create_pipeline_files_sync,
+            pipeline_name, code, requirements, python_test, output_dir
+        )
+    
     def create_pipeline_output(self, pipeline_name: str, code: str, requirements: str, 
                              python_test: str, output_dir="../pipelines") -> str:
         """
         Legacy method name for backward compatibility.
         Delegates to create_pipeline_files.
         """
-        return self.create_pipeline_files(pipeline_name, code, requirements, python_test, output_dir)
+        import asyncio
+        return asyncio.run(self.create_pipeline_files(pipeline_name, code, requirements, python_test, output_dir))
     
     def get_env_template_path(self) -> str:
         """
