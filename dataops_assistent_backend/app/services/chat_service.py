@@ -48,15 +48,15 @@ class ChatService:
         build_result = await self.pipeline_builder_service.build_pipeline_with_templates(analysis["cleaned"])
 
         # Step 3: Store pipeline in MinIO if generation was successful
-        if build_result.get("success"):
-            pipeline_id = await self._store_pipeline_in_minio(build_result, analysis["cleaned"])
-            if pipeline_id:
-                build_result["pipeline_id"] = pipeline_id
-                build_result["stored_in_minio"] = True
-                self.logger.info(f"Pipeline {pipeline_id} stored in MinIO successfully")
-            else:
-                build_result["stored_in_minio"] = False
-                self.logger.warning("Failed to store pipeline in MinIO")
+        # if build_result.get("success"):
+        #     pipeline_id = await self._store_pipeline_in_minio(build_result, analysis["cleaned"])
+        #     if pipeline_id:
+        #         build_result["pipeline_id"] = pipeline_id
+        #         build_result["stored_in_minio"] = True
+        #         self.logger.info(f"Pipeline {pipeline_id} stored in MinIO successfully")
+        #     else:
+        #         build_result["stored_in_minio"] = False
+        #         self.logger.warning("Failed to store pipeline in MinIO")
 
         # Step 4: Sanitize the LLM response for display
         # sanitized_response = self.prompt_guard_service.sanitize_for_display(llm_response)
