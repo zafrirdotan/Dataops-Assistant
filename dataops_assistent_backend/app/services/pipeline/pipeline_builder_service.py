@@ -1,10 +1,11 @@
 import logging
 import jsonschema
 
-from .generators.pipeline_code_generator import PipelineCodeGenerator
+
 from .guards.prompt_guard_service import PromptGuardService
 from app.services.llm_service import LLMService
 from .generators.pipeline_spec_generator import PipelineSpecGenerator
+from .generators.pipeline_code_generator_LLM_manual import PipelineCodeGeneratorLLMManual
 from .generators.pipeline_spec_generator import ETL_SPEC_SCHEMA
 from .sources.local_file_service import LocalFileService
 from .testing.pipeline_test_service import PipelineTestService
@@ -23,7 +24,7 @@ class PipelineBuilderService:
         self.spec_gen = PipelineSpecGenerator()
         self.local_file_service = LocalFileService()
         self.database_service = get_database_service() 
-        self.code_gen = PipelineCodeGenerator()
+        self.code_gen = PipelineCodeGeneratorLLMManual(self.log)
         self.output_service = PipelineOutputService()
         self.test_service = PipelineTestService(self.log)
         # Add other initializations as needed
@@ -168,8 +169,8 @@ class PipelineBuilderService:
                 except Exception as e:
                     self.log.warning(f"Could not convert data preview to DataFrame: {e}")
             
-            # Step 5: Generate pipeline code using templates (much faster)
-            self.log.info("Generating pipeline code using templates...")
+            # Step 5: Generate pipeline code 
+            self.log.info("Generating pipeline code...")
             pipeline_code = await self.code_gen.generate_code(spec, data_preview_df)
             
             # Step 6: Generate test code
@@ -217,13 +218,13 @@ class PipelineBuilderService:
                 "spec": spec,
                 "code": pipeline_code,
                 "test_code": test_code,
-                "requirements": requirements,
-                "storage_info": pipeline_info,  # MinIO storage information
-                "test_result": test_result,    # Test execution results
-                "folder": pipeline_info.get("folder"),  # Virtual folder path for compatibility
-                "message": message,
-                "execution_time": execution_time,
-                "mode": "template-based-minio"
+                # "requirements": requirements,
+                # "storage_info": pipeline_info,  # MinIO storage information
+                # "test_result": test_result,    # Test execution results
+                # "folder": pipeline_info.get("folder"),  # Virtual folder path for compatibility
+                # "message": message,
+                # "execution_time": execution_time,
+                # "mode": "template-based-minio"
             }
             
         except Exception as e:
