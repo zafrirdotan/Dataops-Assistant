@@ -82,12 +82,11 @@ class PipelineBuilderService:
                 self.log.error("Source/Destination connection failed.")
                 return {"error": "Source/Destination connection failed.", "details": db_info.get("details")}
             
-            
-            # Step 5: Generate pipeline code 
+            # Step 4: Generate pipeline code 
             self.log.info("Generating pipeline code...")
             pipeline_code = await self.code_gen.generate_code(spec, db_info)
             
-            # Step 8: Create pipeline files in MinIO (instead of local files)
+            # Step 5: Create pipeline files in MinIO (instead of local files)
             try:
                 pipeline_info = await self.output_service.store_pipeline_files(
                     spec.get("pipeline_name"), 
@@ -99,7 +98,7 @@ class PipelineBuilderService:
                 self.log.error(f"Failed to store pipeline files in MinIO: {e}")
                 return {"error": f"Failed to store pipeline files: {e}"}
             
-            # Step 9: Run tests from MinIO storage
+            # Step 6: Run tests from MinIO storage
             self.log.info("Running pipeline tests from MinIO storage...")
             try:
                 test_result = await self.test_service.run_pipeline_test_in_venv(
@@ -109,7 +108,13 @@ class PipelineBuilderService:
             except Exception as e:
                 self.log.error(f"Failed to run pipeline tests: {e}")
                 test_result = {"success": False, "details": f"Test execution failed: {e}"}
-            
+
+            # Step 7: Iterate to perfect the pipeline based on test results (if needed)
+
+            # Step 8: Dockerize and deploy the pipeline
+
+            # Step 9: e2e testing
+
             execution_time = (datetime.datetime.now() - start_time).seconds
             message = f"Template-based pipeline created successfully in {execution_time} seconds"
             
