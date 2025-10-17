@@ -20,10 +20,16 @@ class PipelineCodeGeneratorLLMHybrid:
         Generate the pipeline code based on the specification and optional data preview.
         """
         
-        # Fix the DataFrame boolean evaluation issu
         prompt = f"""
         You are an expert Python developer specializing in data engineering and ETL pipelines.
         Given the following pipeline specification, generate a complete Python script that implements the pipeline.
+
+        Please follow these guidelines:
+        - Validate all required variables before use (e.g., columns_info).
+        - Add clear error handling and informative logging for each step.
+        - Document assumptions and expected inputs/outputs in comments.
+        - Ensure the code is modular and easy to test.
+        - Use best practices for data privacy and security.
 
         This is the template you should follow:
         {self.getCodeTemplate(spec)}
@@ -51,23 +57,56 @@ class PipelineCodeGeneratorLLMHybrid:
 
     def getCodeTemplate(self, spec: dict) -> str:
         template = f"""
-        import os
-        import pandas as pd
-        import sqlalchemy
-        from sqlalchemy import create_engine
-        import logging
-        from dotenv import load_dotenv
-        import glob
-        # extract_data function to extract data from source
-        {self.getInputTemplate(spec)}
-        # transform_data function to apply transformation logic
-        {self.getTransformationTemplate(spec)}
-        # load_data function to load data to destination
-        {self.getOutputTemplate(spec)}
-        # Main function to orchestrate the pipeline
-        if __name__ == "__main__":
-            main()
-        """
+import os
+import pandas as pd
+import sqlalchemy
+from sqlalchemy import create_engine
+import logging
+from dotenv import load_dotenv
+import glob
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s %(message)s",
+    handlers=[
+        logging.FileHandler("pipeline.log"),
+        logging.StreamHandler()
+    ]
+)
+
+# Global pipeline specification
+spec = {{
+    "pipeline_name": "example_pipeline",
+    "source_type": "PostgreSQL",
+    "source_table": "public.transactions",
+    "destination_type": "PostgreSQL",
+    "destination_name": "dw.fact_transactions",
+    "transformation_logic": "merge into destination by txn_id"
+}}
+
+# extract_data function to extract data from source
+{self.getInputTemplate(spec)}
+# transform_data function to apply transformation logic
+{self.getTransformationTemplate(spec)}
+# load_data function to load data to destination
+{self.getOutputTemplate(spec)}
+# Main function to orchestrate the pipeline
+def main():
+    load_dotenv()
+    try:
+        data = extract_data()
+        if data is not None:
+            transformed_data = transform_data(data)
+            if transformed_data is not None:
+                load_data(transformed_data)
+    except Exception as e:
+        logging.exception("Pipeline execution failed")
+        raise  # Show full error in console
+
+if __name__ == "__main__":
+    main()
+"""
         return template
     
     def getInputTemplate(self, spec: dict) -> str:
@@ -116,6 +155,7 @@ def transform_data(data):
                 return """
 def load_data(data):
     from sqlalchemy.dialects.postgresql import insert
+    from sqlalchemy import text
 
     try:
         database_url = os.getenv('DATABASE_URL')
@@ -123,8 +163,17 @@ def load_data(data):
         schema = spec['destination_name'].split('.')[0]
         table_name = spec['destination_name'].split('.')[1]
         with engine.connect() as conn:
-            conn.execute(f"CREATE SCHEMA IF NOT EXISTS {schema}")
+            conn.execute(text(f"CREATE SCHEMA IF NOT EXISTS {schema}"))
             metadata = sqlalchemy.MetaData()
+            # if table does not exist, create it
+
+            # Dynamically create table if it does not exist
+            columns = [sqlalchemy.Column(col, sqlalchemy.String) for col in data.columns if col != 'txn_id']
+            columns.insert(0, sqlalchemy.Column('txn_id', sqlalchemy.Integer, primary_key=True))
+            table = sqlalchemy.Table(table_name, metadata, *columns, schema=schema)
+            metadata.create_all(engine)
+            
+            # Reflect the table after creation
             table = sqlalchemy.Table(table_name, metadata, autoload_with=engine, schema=schema)
             with engine.begin() as conn:
                 for _, row in data.iterrows():

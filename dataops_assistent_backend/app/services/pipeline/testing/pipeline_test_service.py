@@ -95,13 +95,40 @@ class PipelineTestService:
                 result = subprocess.run([pytest_executable, test_file], capture_output=True, text=True)
                 if result.returncode == 0:
                     self.log.info("All tests passed successfully")
-                    return {"success": True, "details": "All tests passed successfully"}
                 else:
                     self.log.error(f"Tests failed:\n{result.stdout}\n{result.stderr}")
                     return {"success": False, "details": f"Tests failed:\n{result.stdout}\n{result.stderr}"}
             except subprocess.CalledProcessError as e:
                 self.log.error(f"Failed to run tests: {e}")
                 return {"success": False, "details": f"Failed to run tests: {e}"}
+            
+            # Run pipeline code and check for errors in stdout/stderr
+            try:
+                python_executable = os.path.join(venv_dir, 'bin', 'python')
+                result = subprocess.run([python_executable, pipeline_file], capture_output=True, text=True)
+                stdout_lower = result.stdout.lower() if result.stdout else ''
+                stderr_lower = result.stderr.lower() if result.stderr else ''
+                error_keywords = ['error', 'exception', 'traceback', 'fail']
+                found_error = any(kw in stdout_lower or kw in stderr_lower for kw in error_keywords)
+                if result.returncode == 0 and not found_error:
+                    self.log.info("Pipeline executed successfully")
+                    return {"success": True, "details": "Pipeline executed successfully"}
+                elif found_error:
+                    self.log.error(f"Pipeline execution completed but errors detected in output:\n{result.stdout}\n{result.stderr}")
+                    return {"success": False, "details": f"Pipeline execution completed but errors detected in output:\n{result.stdout}\n{result.stderr}"}
+                else:
+                    self.log.error(f"Pipeline execution failed:\n{result.stdout}\n{result.stderr}")
+                    return {"success": False, "details": f"Pipeline execution failed:\n{result.stdout}\n{result.stderr}"}
+            except subprocess.CalledProcessError as e:
+                self.log.error(f"Failed to execute pipeline: {e}")
+                return {"success": False, "details": f"Failed to execute pipeline: {e}"}
+            
+        return {"success": False, "details": "Unexpected error during pipeline testing."}
+   
+
+
+
+
             
 
     
