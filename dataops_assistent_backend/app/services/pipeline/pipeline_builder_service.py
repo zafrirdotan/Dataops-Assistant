@@ -119,13 +119,8 @@ class PipelineBuilderService:
                 "success": True,
                 "pipeline_id": pipeline_id,  # Add pipeline_id to response
                 "spec": spec,
-                # "requirements": requirements,
-                # "storage_info": pipeline_info,  # MinIO storage information
-                # "test_result": test_result,    # Test execution results
-                # "folder": pipeline_info.get("folder"),  # Virtual folder path for compatibility
-                # "message": message,
-                # "execution_time": execution_time,
-                # "mode": "template-based-minio"
+                "test_result": test_result,    # Test execution results
+                "message": message,
             }
             
         except Exception as e:

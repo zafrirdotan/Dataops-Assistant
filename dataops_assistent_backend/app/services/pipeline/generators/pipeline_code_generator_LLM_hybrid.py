@@ -24,14 +24,6 @@ class PipelineCodeGeneratorLLMHybrid:
         You are an expert Python developer specializing in data engineering and ETL pipelines.
         Given the following pipeline specification, generate a complete Python script that implements the pipeline.
 
-        Please follow these guidelines:
-        - Validate all required variables before use (e.g., columns_info).
-        - Add clear error handling and informative logging for each step.
-        - Document assumptions and expected inputs/outputs in comments.
-        - Ensure the code is modular and easy to test.
-        - Use best practices for data privacy and security.
-        - Include environment variable usage for sensitive information
-
         Pipeline Specification:
         {json.dumps(spec, indent=2)}
         Data Preview:
@@ -39,8 +31,8 @@ class PipelineCodeGeneratorLLMHybrid:
         Columns Info:
         {db_info.get("columns")}
 
-        Code Structure:
-        {self.getInputPrompt(spec)}
+        Implementation Instructions:
+        {self.getImplementationInstructions(spec)}
 
         This is the template you should follow:
         {self.getCodeTemplate(spec)}
@@ -59,7 +51,26 @@ class PipelineCodeGeneratorLLMHybrid:
             "tests": self._clean_generated_code(await self.generate_test_code(spec, db_info.get("data_preview")))
         }
     
-    def getInputPrompt(self, spec: dict) -> str:
+    def getImplementationInstructions(self, spec: dict) -> str:
+        
+        instructions = f"""
+          Please follow these guidelines:
+        - Validate all required variables before use.
+        - Add clear error handling and informative logging for each step.
+        - Document assumptions and expected inputs/outputs in comments.
+        - Ensure the code is modular and easy to test.
+        - Use best practices for data privacy and security.
+        - Include environment variable usage for sensitive information
+        
+        Input Specification:
+        {self.getInputSpecifications(spec)}
+        
+        Output Specification:
+        {self.getOutputsSpecifications(spec)}
+        """
+        return instructions
+
+    def getInputSpecifications(self, spec: dict) -> str:
         """
         Generate a prompt for the LLM to extract inputs from the specification.
         """
@@ -69,7 +80,7 @@ class PipelineCodeGeneratorLLMHybrid:
             "localfilecsv": (
                 "The source is one or more local CSV files. "
                 "The path to the local file is provided in os.getenv('DATA_FOLDER', '../../data'). "
-                "Use wildcard patterns to match multiple files if specified (e.g., './data/*.csv')."
+                "Use wildcard patterns to match multiple files if specified"
                 "Use the glob library to find all matching files."
                 "Include error handling for file not found and read errors."
             ),
@@ -97,6 +108,49 @@ class PipelineCodeGeneratorLLMHybrid:
         {prompt_detail}
         """
         return prompt
+    
+
+    def getOutputsSpecifications(self, spec: dict) -> str:
+        """
+        Generate a prompt for the LLM to extract outputs from the specification.
+        """
+
+        prompt_details = {
+            "parquet": (
+                "The destination is Parquet files. "
+                # "The output folder is located in minio."
+                # "in the tamplet example you will find how to connect to minio using environment variables."
+                "The output folder is specified in os.getenv('OUTPUT_FOLDER', './output'). "
+            ),
+            "sqlite": (
+                "The destination is a SQLite database. "
+                "The connection string is provided in os.getenv('DATABASE_URL'). "
+            ),
+            "PostgreSQL": (
+                "The destination is a Postgres database. "
+                "The connection string is provided in os.getenv('DATABASE_URL'). "
+                "Use SQLAlchemy to connect and pandas to write the data. "
+                "The destination table name is provided in the spec dictionary as spec['destination_name']. "
+                "Before writing, check if the schema exists and create it if it does not. "
+                "Include error handling for connection issues and write errors."
+            ),
+            # "api": (
+            #     "The destination is an API endpoint. "
+            #     "Please specify the endpoint, authentication method, and parameters. "
+            #     "Include error handling for network issues and invalid responses."
+            # )
+
+        }
+        
+        destination_type = spec.get("destination_type", "")
+        
+        prompt_detail = prompt_details.get(
+            destination_type,
+            "Unknown destination type. Please provide details."
+        )
+
+        return prompt_detail
+
 
     def getCodeTemplate(self, spec: dict) -> str:
         template = f"""
@@ -239,7 +293,7 @@ def load_data(data):
         schema = spec['destination_name'].split('.')[0]
         table_name = spec['destination_name'].split('.')[1]
         with engine.connect() as conn:
-            conn.execute(f"CREATE SCHEMA IF NOT EXISTS {schema}")
+            conn.execute(text(f"CREATE SCHEMA IF NOT EXISTS {schema}"))
             data.to_sql(table_name, con=engine, schema=schema, if_exists='append', index=False)
     except Exception as e:
         logging.error(f"Error loading data to PostgreSQL: {str(e)}")
@@ -247,14 +301,14 @@ def load_data(data):
         
         elif destination_type == "parquet":
             return """
-def load_data(data):
-    try:
-        output_folder = os.getenv('OUTPUT_FOLDER', './output')
-        os.makedirs(output_folder, exist_ok=True)
-        output_path = os.path.join(output_folder, 'output.parquet')
-        data.to_parquet(output_path, index=False)
-    except Exception as e:
-        logging.error(f"Error loading data to Parquet: {str(e)}")
+        def load_data(data):
+            try:
+                output_folder = os.getenv('OUTPUT_FOLDER', './output')
+                os.makedirs(output_folder, exist_ok=True)
+                output_path = os.path.join(output_folder, 'output.parquet')
+                data.to_parquet(output_path, index=False)
+            except Exception as e:
+                logging.error(f"Error loading data to Parquet: {str(e)}")
             """
         elif destination_type == "sqlite":
             return """
@@ -327,7 +381,9 @@ if __name__ == "__main__":
             "pyarrow>=14.0.0",
             "requests>=2.31.0",
             "pytest>=7.0.0",
-            "python-dotenv>=1.0.0"
+            "python-dotenv>=1.0.0",
+            "minio"
+
         ]
         return '\n'.join(requirements)
     
@@ -356,3 +412,24 @@ if __name__ == "__main__":
         return '\n'.join(cleaned_lines)
     
     
+    #  from minio import Minio 
+    # # MinIO configuration from environment variables
+    #     minio_endpoint = os.getenv('MINIO_ENDPOINT')
+    #     minio_access_key = os.getenv('MINIO_ACCESS_KEY')
+    #     minio_secret_key = os.getenv('MINIO_SECRET_KEY')
+    #     minio_bucket = os.getenv('MINIO_BUCKET', 'default-bucket')
+
+    #     minio_client = Minio(
+    #         minio_endpoint,
+    #         access_key=minio_access_key,
+    #         secret_key=minio_secret_key,
+    #         secure=False  # Set to True if using HTTPS
+    #     )
+
+    #     # Upload the file
+    #     minio_client.fput_object(
+    #         minio_bucket,
+    #         'output.parquet',
+    #         output_path
+    #     )
+    #     # logging.info(f"Saved Parquet to MinIO bucket {minio_bucket}")

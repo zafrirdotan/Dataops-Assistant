@@ -8,7 +8,7 @@ ETL_SPEC_SCHEMA = {
     "properties": {
         "pipeline_name": {
             "type": "string",
-            "description": "A name for the pipeline",
+            "description": "A name for the pipeline in snake_case format",
         },
         "source_type": {
             "type": "string",
