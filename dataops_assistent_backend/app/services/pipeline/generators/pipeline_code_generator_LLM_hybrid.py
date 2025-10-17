@@ -30,9 +30,7 @@ class PipelineCodeGeneratorLLMHybrid:
         - Document assumptions and expected inputs/outputs in comments.
         - Ensure the code is modular and easy to test.
         - Use best practices for data privacy and security.
-
-        This is the template you should follow:
-        {self.getCodeTemplate(spec)}
+        - Include environment variable usage for sensitive information
 
         Pipeline Specification:
         {json.dumps(spec, indent=2)}
@@ -40,6 +38,12 @@ class PipelineCodeGeneratorLLMHybrid:
         {db_info.get("data_preview")}
         Columns Info:
         {db_info.get("columns")}
+
+        Code Structure:
+        {self.getInputPrompt(spec)}
+
+        This is the template you should follow:
+        {self.getCodeTemplate(spec)}
         """
 
         try:
@@ -54,6 +58,45 @@ class PipelineCodeGeneratorLLMHybrid:
             "requirements": self.generate_requirements_txt(),
             "tests": self._clean_generated_code(await self.generate_test_code(spec, db_info.get("data_preview")))
         }
+    
+    def getInputPrompt(self, spec: dict) -> str:
+        """
+        Generate a prompt for the LLM to extract inputs from the specification.
+        """
+        source_type = spec.get("source_type", "")
+
+        prompt_details = {
+            "localfilecsv": (
+                "The source is one or more local CSV files. "
+                "The path to the local file is provided in os.getenv('DATA_FOLDER', '../../data'). "
+                "Use wildcard patterns to match multiple files if specified (e.g., './data/*.csv')."
+                "Use the glob library to find all matching files."
+                "Include error handling for file not found and read errors."
+            ),
+            "PostgreSQL": (
+                "The source is a postgres database. "
+                "The connection string is provided in os.getenv('DATABASE_URL'). "
+                "Use SQLAlchemy to connect and pandas to read the data."
+                "Include error handling for connection issues and query errors."
+                "The source table name is provided in the spec dictionary as spec['source_table']"
+                "The source path is provided in the spec dictionary as spec['source_path']"
+            ),
+            # "api": (
+            #     "The source is an API. "
+            #     "Please specify the endpoint, authentication method, and parameters. "
+            #     "Include error handling for network issues and invalid responses."
+            # )
+        }
+
+        prompt_detail = prompt_details.get(
+            source_type,
+            "Unknown source type. Please provide details."
+        )
+
+        prompt = f"""
+        {prompt_detail}
+        """
+        return prompt
 
     def getCodeTemplate(self, spec: dict) -> str:
         template = f"""
