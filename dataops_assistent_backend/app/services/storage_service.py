@@ -131,11 +131,28 @@ class MinioStorage:
         try:
             logger.info(f"Storing pipeline {pipeline_id} with version {timestamp}")
             
+            pipeline_path = f"{pipeline_id}/v{timestamp}"
             # Store pipeline code
             if 'code' in pipeline_data:
-                code_path = f"{pipeline_id}/v{timestamp}/pipeline.py"
+                code_path = f"{pipeline_path}/pipeline.py"
                 await self._store_text_file("pipeline-code", code_path, pipeline_data['code'])
                 stored_files['code'] = f"s3://pipeline-code/{code_path}"
+            
+            # Store requirements.txt
+            if 'requirements' in pipeline_data:
+                req_path = f"{pipeline_path}/requirements.txt"
+                await self._store_text_file("pipeline-code", req_path, pipeline_data['requirements'])
+                stored_files['requirements'] = f"s3://pipeline-code/{req_path}"
+
+            if 'test_code' in pipeline_data:
+                test_path = f"{pipeline_path}/test.py"
+                await self._store_text_file("pipeline-tests", test_path, pipeline_data['test_code'])
+                stored_files['test_code'] = f"s3://pipeline-tests/{test_path}"
+
+            if 'env_template' in pipeline_data:
+                env_path = f"{pipeline_path}/.env"
+                await self._store_text_file("pipeline-code", env_path, pipeline_data['env_template'])
+                stored_files['env_template'] = f"s3://pipeline-code/{env_path}"
             
             # Store pipeline specification
             if 'spec' in pipeline_data:

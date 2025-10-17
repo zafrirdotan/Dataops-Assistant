@@ -4,8 +4,10 @@ import asyncio
 import logging
 import datetime
 import uuid
+import json
 from typing import Dict, Any
 from app.services.storage_service import MinioStorage
+from ..types import CodeGenResult
 
 class PipelineOutputService:
     """
@@ -20,8 +22,7 @@ class PipelineOutputService:
         self.template_dir = os.path.dirname(__file__)
         self.env_template_path = os.path.join(self.template_dir, ".env.template")
     
-    async def create_pipeline_files(self, pipeline_name: str, code: str, requirements: str, 
-                            python_test: str, output_dir="../pipelines") -> Dict[str, Any]:
+    async def store_pipeline_files(self, pipeline_name: str, code: CodeGenResult) -> Dict[str, Any]:
         """
         Creates pipeline files and stores them directly in MinIO instead of local filesystem.
         
@@ -47,13 +48,19 @@ class PipelineOutputService:
             await self.storage_service.initialize_pipeline_buckets()
             
             # Prepare pipeline data for MinIO storage
+            
+            def ensure_str(val):
+                if isinstance(val, dict):
+                    return json.dumps(val, indent=2)
+                return str(val)
+
             pipeline_data = {
-                "code": code,
-                "test_code": python_test,
-                "requirements": requirements,
-                "user_input": f"Pipeline: {pipeline_name}",
+                "code": ensure_str(code["code"]),
+                "test_code": ensure_str(code["tests"]),
+                "requirements": ensure_str(code["requirements"]),
                 "created_at": datetime.datetime.now().isoformat(),
-                "mode": "template-based-minio"
+                "pipeline_name": pipeline_name,
+                "env_template": self.get_env_as_string()
             }
             
             # Store pipeline directly in MinIO
@@ -76,6 +83,38 @@ class PipelineOutputService:
             self.log.error(f"Failed to create pipeline files in MinIO: {e}")
             raise Exception(f"Pipeline file creation failed: {e}")
     
+    def get_env_as_string(self) -> str:
+        """
+        Reads the .env.template file and returns its content as a string.
+        
+        Returns:
+            str: Content of the .env.template file
+        """
+        try:
+            with open(self.env_template_path, "r") as f:
+                return f.read()
+        except Exception as e:
+            self.log.error(f"Failed to read .env template: {e}")
+
+    def get_pipeline_files(self, pipeline_id: str) -> Dict[str, str]:
+        """
+        Retrieves the pipeline files from MinIO storage.
+        
+        Args:
+            pipeline_id: Unique ID of the pipeline
+        Returns:
+            Dict[str, str]: Dictionary containing the content of the pipeline files
+        """
+        try:
+            stored_files = self.storage_service.retrieve_pipeline(pipeline_id)
+            if not stored_files:
+                self.log.error(f"No files found for pipeline ID: {pipeline_id}")
+                return {}
+            return stored_files
+        except Exception as e:
+            self.log.error(f"Failed to retrieve pipeline files from MinIO: {e}")
+            return {}    
+        
     def _create_pipeline_files_sync(self, pipeline_name: str, code: str, requirements: str, 
                             python_test: str, output_dir="../pipelines") -> str:
         """Synchronous version for thread pool execution."""
@@ -168,7 +207,7 @@ CMD ["python", "{pipeline_name}.py"]
         Delegates to create_pipeline_files.
         """
         import asyncio
-        return asyncio.run(self.create_pipeline_files(pipeline_name, code, requirements, python_test, output_dir))
+        return asyncio.run(self.store_pipeline_files(pipeline_name, code, requirements, python_test, output_dir))
     
     def get_env_template_path(self) -> str:
         """

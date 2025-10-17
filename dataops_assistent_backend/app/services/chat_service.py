@@ -96,9 +96,9 @@ class ChatService:
             pipeline_data["logs"] = f"Pipeline generated at {datetime.now()}\nMode: {build_result.get('mode', 'template-based')}\nExecution time: {build_result.get('execution_time', 0)} seconds"
             
             # Store in MinIO
-            stored_files = await self.storage_service.store_pipeline(pipeline_id, pipeline_data)
+            # stored_files = await self.storage_service.store_pipeline(pipeline_id, pipeline_data)
             
-            self.logger.info(f"Stored pipeline {pipeline_id} with {len(stored_files)} files")
+            # self.logger.info(f"Stored pipeline {pipeline_id} with {len(stored_files)} files")
             return pipeline_id
             
         except Exception as e:
