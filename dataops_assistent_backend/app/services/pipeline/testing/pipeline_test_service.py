@@ -32,10 +32,7 @@ class PipelineTestService:
             return {"success": False, "details": f"Failed to retrieve pipeline files: {e}"}
         
         self.log.info(f"Retrieved files for pipeline ID: {pipeline_id}")
-        self.log.info(f"Stored files content: {stored_files}")
-
-            
-
+       
         pipeline_name = pipeline_id.split('_')[0]  # Assuming pipeline_id format is <name>_<unique>
             
         # Create temporary directory for execution
@@ -49,8 +46,6 @@ class PipelineTestService:
             requirements_file = os.path.join(execution_dir, "requirements.txt")
             env_file = os.path.join(execution_dir, ".env")
             
-            # log all stored_files data to debug
-            self.log.info(f"Stored files content: {stored_files}")
 
             # Write files asynchronously
             try:
@@ -64,7 +59,7 @@ class PipelineTestService:
                     await f.write(stored_files.get('requirements', ''))
 
                 async with aiofiles.open(env_file, 'w') as f:
-                    await f.write(stored_files.get('env', ''))
+                    await f.write(stored_files.get('.env', ''))
                 
                 self.log.info(f"Pipeline files written to temporary directory: {execution_dir}")
             except Exception as e:

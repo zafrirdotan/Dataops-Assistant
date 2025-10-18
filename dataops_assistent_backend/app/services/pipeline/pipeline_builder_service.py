@@ -12,6 +12,7 @@ from .testing.pipeline_test_service import PipelineTestService
 from app.services.database_service import get_database_service
 from .deployment.pipeline_output_service import PipelineOutputService
 from .sources.source_service import SourceService
+from .deployment.dockerize_service import DockerizeService
 import pandas as pd
 import datetime
 
@@ -28,6 +29,7 @@ class PipelineBuilderService:
         self.output_service = PipelineOutputService()
         self.test_service = PipelineTestService(self.log)
         self.source_service = SourceService(self.log)
+        self.dockerize_service = DockerizeService(self.log)
         # Add other initializations as needed
 
     def validate_spec_schema(self, spec: dict) -> bool:
@@ -113,6 +115,9 @@ class PipelineBuilderService:
 
             # Step 8: Dockerize and deploy the pipeline
 
+            self.log.info("Dockerizing and deploying the pipeline...")
+            dockerize_result = await self.dockerize_service.dockerize_pipeline(pipeline_id)
+
             # Step 9: e2e testing
 
             execution_time = (datetime.datetime.now() - start_time).seconds
@@ -126,6 +131,7 @@ class PipelineBuilderService:
                 "spec": spec,
                 "test_result": test_result,    # Test execution results
                 "message": message,
+                "dockerize_result": dockerize_result
             }
             
         except Exception as e:

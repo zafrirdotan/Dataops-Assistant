@@ -19,9 +19,13 @@ services:
       - S3_BUCKET=dataops-bucket
       - DATA_FOLDER=/app/data
       - DATABASE_URL=postgresql://dataops_user:dataops_password@postgres:5432/dataops_db
+      - HOST_DATA_PATH=${HOST_DATA_PATH}
+      - HOST_OUTPUT_PATH=${HOST_OUTPUT_PATH}
+
     volumes:
-      - ./data:/app/data
-      - ./output:/app/output
+      - ${HOST_DATA_PATH}:/app/data
+      - ${HOST_OUTPUT_PATH}:/app/output
+      - /var/run/docker.sock:/var/run/docker.sock
       #   # TODO: REMOVE FOR PRODUCTION - Development volume mount for hot-reload
       # - ./dataops_assistent_backend:/app
 

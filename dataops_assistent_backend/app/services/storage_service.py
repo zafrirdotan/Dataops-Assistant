@@ -152,7 +152,12 @@ class MinioStorage:
             if 'env_template' in pipeline_data:
                 env_path = f"{pipeline_path}/.env"
                 await self._store_text_file("pipeline-code", env_path, pipeline_data['env_template'])
-                stored_files['env_template'] = f"s3://pipeline-code/{env_path}"
+                stored_files['.env'] = f"s3://pipeline-code/{env_path}"
+
+            if 'dockerfile' in pipeline_data:
+                dockerfile_path = f"{pipeline_path}/Dockerfile"
+                await self._store_text_file("pipeline-code", dockerfile_path, pipeline_data['dockerfile'])
+                stored_files['dockerfile'] = f"s3://pipeline-code/{dockerfile_path}"
             
             # Store pipeline specification
             if 'spec' in pipeline_data:

@@ -21,6 +21,7 @@ class PipelineOutputService:
         # Keep template dir for backward compatibility
         self.template_dir = os.path.dirname(__file__)
         self.env_template_path = os.path.join(self.template_dir, ".env.template")
+        self.dockerfile_template_path = os.path.join(self.template_dir, "Dockerfile.template")
     
     async def store_pipeline_files(self, pipeline_name: str, code: CodeGenResult) -> Dict[str, Any]:
         """
@@ -57,7 +58,8 @@ class PipelineOutputService:
                 "requirements": ensure_str(code["requirements"]),
                 "created_at": datetime.datetime.now().isoformat(),
                 "pipeline_name": pipeline_name,
-                "env_template": self.get_env_as_string()
+                "env_template": self.get_env_as_string(),
+                "dockerfile": self.get_dockerfile_as_string(),
             }
             
             # Store pipeline directly in MinIO
@@ -92,6 +94,19 @@ class PipelineOutputService:
                 return f.read()
         except Exception as e:
             self.log.error(f"Failed to read .env template: {e}")
+
+    def get_dockerfile_as_string(self) -> str:
+        """
+        Reads the Dockerfile.template file and returns its content as a string.
+
+        Returns:
+            str: Content of the Dockerfile.template file
+        """
+        try:
+            with open(self.dockerfile_template_path, "r") as f:
+                return f.read()
+        except Exception as e:
+            self.log.error(f"Failed to read Dockerfile template: {e}")
 
     def get_pipeline_files(self, pipeline_id: str) -> Dict[str, str]:
         """
