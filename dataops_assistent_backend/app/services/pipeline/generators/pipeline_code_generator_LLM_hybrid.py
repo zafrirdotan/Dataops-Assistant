@@ -36,17 +36,20 @@ class PipelineCodeGeneratorLLMHybrid:
 
         This is the template you should follow:
         {self.getCodeTemplate(spec)}
+
+        Use only the libraries specified in the requirements.txt.
+        {self.generate_requirements_txt()}
         """
 
         try:
-            self.log.info(f"Generating code with prompt: {prompt}")
-            response = await self.llm.generate_response_async(prompt)
+            # self.log.info(f"Generating code with prompt: {prompt}")
+            response = await self.llm.response_create_async(input = prompt)
         except Exception as e:
             self.log.error(f"Error generating code: {e}")
             return ""
 
         return {
-            "code": self._clean_generated_code(response),
+            "code": self._clean_generated_code(response.output_text),
             "requirements": self.generate_requirements_txt(),
             "tests": self._clean_generated_code(await self.generate_test_code(spec, db_info.get("data_preview")))
         }
@@ -409,7 +412,7 @@ if __name__ == "__main__":
             cleaned_line = line.rstrip()
             cleaned_lines.append(cleaned_line)
         
-        return '\n'.join(cleaned_lines)
+        return '\n'.join(cleaned_lines).replace("```", "")
     
     
     #  from minio import Minio 

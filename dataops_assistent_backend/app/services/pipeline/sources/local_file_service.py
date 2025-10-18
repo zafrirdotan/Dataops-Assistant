@@ -92,7 +92,7 @@ class LocalFileService:
         return exists
 
     # Async methods
-    async def retrieve_recent_data_files(self, file_pattern, date_column=None, date_value=None):
+    async def retrieve_recent_data_files(self, file_pattern, date_column=None, date_value=None, limit=None):
         """
         Asynchronously extract data from CSV or JSON files matching the pattern.
         """
@@ -100,10 +100,11 @@ class LocalFileService:
             self._retrieve_recent_data_files_sync, 
             file_pattern, 
             date_column, 
-            date_value
+            date_value,
+            limit
         )
     
-    def _retrieve_recent_data_files_sync(self, file_pattern, date_column=None, date_value=None):
+    def _retrieve_recent_data_files_sync(self, file_pattern, date_column=None, date_value=None, limit=None):
         """Synchronous version for thread pool execution."""
         try:
             full_pattern = self._resolve_pattern(file_pattern)
@@ -129,6 +130,8 @@ class LocalFileService:
                 df = df[df[date_column] == date_value]
             data_frames.append(df)
         if data_frames:
+            if limit is not None:
+                data_frames = data_frames[:limit]
             return pd.concat(data_frames, ignore_index=True)
         else:
             raise FileNotFoundError(f"No files found in last 24 hours for pattern: {file_pattern}")

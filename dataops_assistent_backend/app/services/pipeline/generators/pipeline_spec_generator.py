@@ -81,9 +81,7 @@ class PipelineSpecGenerator:
             """
             
             response = await self.llm.response_create_async(
-                model = "gpt-4.1",
                 input = prompt,
-                temperature = 0,
                 text={
                 "format": {
                     "type": "json_schema",

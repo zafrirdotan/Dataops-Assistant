@@ -215,35 +215,6 @@ class DatabaseService:
             logger.error(f"Async query execution failed: {e}")
             raise
 
-    async def get_connection_info_async(self) -> dict:
-        """Get detailed connection information for debugging asynchronously."""
-        try:
-            async with self.async_engine.connect() as connection:
-                # Get database version and connection info
-                result = await connection.execute(text("SELECT version()"))
-                db_version = result.fetchone()[0]
-                
-                result = await connection.execute(text("SELECT current_database(), current_user, inet_server_addr(), inet_server_port()"))
-                conn_info = result.fetchone()
-                
-                return {
-                    "connected": True,
-                    "database_version": db_version,
-                    "current_database": conn_info[0],
-                    "current_user": conn_info[1],
-                    "server_address": conn_info[2],
-                    "server_port": conn_info[3],
-                    "connection_url": ASYNC_DATABASE_URL.replace(ASYNC_DATABASE_URL.split('@')[0].split('//')[1], '***:***')  # Hide credentials
-                }
-        except Exception as e:
-            return {
-                "connected": False,
-                "error": str(e),
-                "error_type": type(e).__name__,
-                "connection_url": ASYNC_DATABASE_URL.replace(ASYNC_DATABASE_URL.split('@')[0].split('//')[1], '***:***')
-            }
-
-
 # Global database service instance
 database_service = DatabaseService()
 

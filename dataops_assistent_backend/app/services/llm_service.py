@@ -5,6 +5,7 @@ Service for handling calls to OpenAI or other LLM providers.
 
 from typing import Optional
 import os
+from xml.parsers.expat import model
 import openai
 import asyncio
 
@@ -24,52 +25,21 @@ class LLMService:
                 self.client = None
                 self.async_client = None
 
-    def generate_response(self, prompt: str) -> str:
-        if self.provider == "openai" and self.api_key:
-            try:
-                response =  self.client.responses.create(
-                    model=self.model,
-                    input=[{"role": "user", "content": prompt}]
-                )
-                return response.output_text
-            except Exception as e:
-                return f"OpenAI API error: {e}"
-        # Add other providers here as needed
-        return f"[LLM {self.provider}] Response to: {prompt}"
-    
-
-   # basic response create wrapper for openai
-    def response_create(self, **kwargs) -> Optional[dict]:
-        if self.provider == "openai" and self.api_key:
-            try:
-                response =  self.client.responses.create(**kwargs)
-                return response
-            except Exception as e:
-                return f"OpenAI API error: {e}"
-        return None
-
-    # Async methods
-    async def generate_response_async(self, prompt: str) -> str:
+    async def response_create_async(self, input, text = None) -> Optional[dict] | str:
+        """
+        Async wrapper for openai.AsyncClient.responses.create. Accepts same kwargs as the sync version.
+        Returns the response (usually a dict-like object) or an error string.
+        """
         if self.provider == "openai" and self.api_key and self.async_client:
             try:
                 response = await self.async_client.responses.create(
-                    model=self.model,
-                    input=[{"role": "user", "content": prompt}]
-                )
-                return response.output_text
-            except Exception as e:
-                return f"OpenAI API error: {e}"
-        # Fallback to sync version
-        return self.generate_response(prompt)
-    
-    async def response_create_async(self, **kwargs) -> Optional[dict]:
-        if self.provider == "openai" and self.api_key and self.async_client:
-            try:
-                response = await self.async_client.responses.create(**kwargs)
+                        model="gpt-4.1",
+                        input=input,
+                        temperature=0,
+                        text=text)
+                
                 return response
             except Exception as e:
                 return f"OpenAI API error: {e}"
-        # Fallback to sync version
-        return self.response_create(**kwargs)
     
 

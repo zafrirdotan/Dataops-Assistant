@@ -45,7 +45,7 @@ class ChatService:
                 }
 
         # Step 2: Generate pipeline 
-        build_result = await self.pipeline_builder_service.build_pipeline_with_templates(analysis["cleaned"])
+        build_result = await self.pipeline_builder_service.build_pipeline(analysis["cleaned"])
 
         # Step 3: Store pipeline in MinIO if generation was successful
         # if build_result.get("success"):

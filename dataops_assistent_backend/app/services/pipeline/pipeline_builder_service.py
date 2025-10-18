@@ -57,7 +57,7 @@ class PipelineBuilderService:
         return True
 
 
-    async def build_pipeline_with_templates(self, user_input: str, output_dir: str = "pipelines") -> dict:
+    async def build_pipeline(self, user_input: str, output_dir: str = "pipelines") -> dict:
         """
         Build a pipeline using the new template-based approach.
         This is a more efficient alternative to the full build_pipeline method.
@@ -77,7 +77,7 @@ class PipelineBuilderService:
             
             # step 3. Try connecting to source/destination
             self.log.info("Connecting to source/destination to validate access...")
-            db_info = await self.source_service.connect_to_source(spec)
+            db_info = await self.source_service.fetch_data_from_source(spec, limit=5)
             if not db_info.get("success"):
                 self.log.error("Source/Destination connection failed.")
                 return {"error": "Source/Destination connection failed.", "details": db_info.get("details")}
