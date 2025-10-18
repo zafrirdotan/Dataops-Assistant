@@ -104,6 +104,15 @@ class DockerizeService:
                 self.docker_client.containers.prune(filters={"label": "app=dataops-assistant"})
 
                 self.log.info(f"Docker container started for pipeline ID: {pipeline_id}, Container ID: {container.id}")
+
+                # Remove the container and image after running
+                container.wait()  # Wait for the container to finish
+                
+                logs = container.logs().decode('utf-8')
+                self.log.info(f"Container logs:\n{logs}")
+
+                container.remove(force=True)
+                self.docker_client.images.remove(image=image_tag, force=True)
             except Exception as e:
                 self.log.error(f"Failed to start Docker container: {e}")
                 return {"success": False, "details": f"Failed to start Docker container: {e}"}

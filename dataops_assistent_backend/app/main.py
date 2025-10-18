@@ -1,6 +1,7 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from app.routes import chat
+from app.routes import pipeline
 from app.services.storage_service import MinioStorage
 from app.services.database_service import get_database_service
 import logging
@@ -87,3 +88,4 @@ async def health_check():
 
 # Include routers
 app.include_router(chat.router, prefix="/chat", tags=["chat"])
+app.include_router(pipeline.router, tags=["pipeline"])
