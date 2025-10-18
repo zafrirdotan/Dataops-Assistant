@@ -1,0 +1,5 @@
+# Airflow requirements
+apache-airflow==2.9.0
+# Add any additional providers you need, e.g.:
+# apache-airflow-providers-docker
+# apache-airflow-providers-postgres
