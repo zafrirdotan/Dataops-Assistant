@@ -1,0 +1,18 @@
+{
+  "pipelines": [
+    {
+      "id": "orders_daily",
+      "description": "ETL for orders",
+      "schedule": "0 2 * * *",
+      "mode": "incremental",
+      "tags": ["etl", "orders"]
+    },
+    {
+      "id": "users_hourly",
+      "description": "ETL for users",
+      "schedule": "0 * * * *",
+      "mode": "full",
+      "tags": ["etl", "users"]
+    }
+  ]
+}

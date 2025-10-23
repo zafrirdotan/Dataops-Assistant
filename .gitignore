@@ -13,9 +13,6 @@ output/
 # Data
 data/
 
-# Pipelines
-pipelines/
-
 # Docker volumes
 postgres_data/
 minio_data/

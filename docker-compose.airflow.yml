@@ -1,0 +1,85 @@
+name: airflow
+volumes:
+  airflow-db:
+  app-db:
+
+x-airflow-common: &airflow-common
+  image: apache/airflow:3.1.0
+  environment:
+    # --- Airflow core ---
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+    AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "true"
+    AIRFLOW__SCHEDULER__DAG_DIR_LIST_INTERVAL: 10
+    # --- Airflow metadata DB (separate from your app DB) ---
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-postgres:5432/airflow
+    # --- Your app DB connection (available to tasks) ---
+    DATABASE_URL: postgresql://dataops_user:dataops_password@postgres:5432/dataops_db
+    AIRFLOW_CONN_APP_DB: postgresql+psycopg2://dataops_user:dataops_password@postgres:5432/dataops_db
+  user: "${AIRFLOW_UID:-50000}:${AIRFLOW_GID:-0}"
+  volumes:
+    - ./airflow/dags:/opt/airflow/dags
+    - ./airflow/logs:/opt/airflow/logs
+    - ./airflow/plugins:/opt/airflow/plugins
+    # If you plan to run DockerOperator, keep these:
+    - /var/run/docker.sock:/var/run/docker.sock
+    - /tmp:/tmp
+  depends_on:
+    airflow-postgres:
+      condition: service_healthy
+
+services:
+  # ---------------- App Postgres (for your ETL/data) ----------------
+  airflow-postgres:
+    image: postgres:15-alpine
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U airflow -d airflow"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    volumes:
+      - airflow-db:/var/lib/postgresql/data
+      - ./airflow/dags/pipelines/catalog.json:/opt/airflow/dags/pipelines/catalog.json
+
+  # ---------------- One-time DB init & user ----------------
+  airflow-init:
+    <<: *airflow-common
+    entrypoint: /bin/bash
+    command:
+      - -lc
+      - |
+        set -e
+        airflow db migrate
+        airflow users create \
+          --username admin \
+          --firstname Air \
+          --lastname Flow \
+          --role Admin \
+          --email admin@example.com \
+          --password admin
+        echo "Airflow init done."
+    restart: "no"
+
+  # ---------------- Airflow services ----------------
+  airflow-webserver:
+    <<: *airflow-common
+    command: api-server
+    ports:
+      - "8082:8080"
+    restart: unless-stopped
+
+  airflow-scheduler:
+    <<: *airflow-common
+    command: scheduler
+    restart: unless-stopped
+
+  dag-processor:
+    <<: *airflow-common
+    command: dag-processor
+    restart: unless-stopped
