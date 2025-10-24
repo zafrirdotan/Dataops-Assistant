@@ -20,3 +20,6 @@ minio_data/
 # Data Loaders
 data-loaders/logs/
 *.log
+
+# Airflow logs
+airflow/logs/

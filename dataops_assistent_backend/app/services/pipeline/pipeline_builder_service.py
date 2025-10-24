@@ -1,5 +1,7 @@
 import logging
 import jsonschema
+import pandas as pd
+import datetime
 
 
 from .guards.prompt_guard_service import PromptGuardService
@@ -13,9 +15,7 @@ from app.services.database_service import get_database_service
 from .deployment.pipeline_output_service import PipelineOutputService
 from .sources.source_service import SourceService
 from .deployment.dockerize_service import DockerizeService
-import pandas as pd
-import datetime
-
+from .deployment.scheduler_service import SchedulerService
 class PipelineBuilderService:
     def __init__(self):
         self.log = logging.getLogger(__name__)
@@ -30,7 +30,8 @@ class PipelineBuilderService:
         self.test_service = PipelineTestService(self.log)
         self.source_service = SourceService(self.log)
         self.dockerize_service = DockerizeService(self.log)
-        # Add other initializations as needed
+        self.scheduler_service = SchedulerService(self.log)
+
 
     def validate_spec_schema(self, spec: dict) -> bool:
         # Validate spec against ETL_SPEC_SCHEMA using jsonschema
@@ -114,12 +115,16 @@ class PipelineBuilderService:
             # Step 7: Iterate to perfect the pipeline based on test results (if needed)
 
             # Step 8: Dockerize and deploy the pipeline
-
             self.log.info("Dockerizing and deploying the pipeline...")
             dockerize_result = await self.dockerize_service.dockerize_pipeline(pipeline_id)
 
+            # Step 9: Save pipeline to catalog.json for Airflow scheduling
+            scheduled_result = await self.scheduler_service.save_pipeline_to_catalog(
+                pipeline_id,
+                spec
+            )
+         
             # Step 9: e2e testing
-
             execution_time = (datetime.datetime.now() - start_time).seconds
             message = f"Template-based pipeline created successfully in {execution_time} seconds"
             
@@ -131,7 +136,8 @@ class PipelineBuilderService:
                 "spec": spec,
                 "test_result": test_result,    # Test execution results
                 "message": message,
-                "dockerize_result": dockerize_result
+                "dockerize_result": dockerize_result,
+                "scheduling_result": scheduled_result
             }
             
         except Exception as e:

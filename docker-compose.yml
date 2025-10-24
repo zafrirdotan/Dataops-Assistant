@@ -26,6 +26,11 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./airflow/dags/pipelines/catalog.json:/app/catalog.json
 
+    networks:
+      dataops-assistant-net:
+        aliases:
+          - dataops-assistant
+
   data-loader:
     build: ./data-loader-service
     restart: "no" # Run once and stop
@@ -50,6 +55,8 @@ services:
       - LOAD_SAMPLE_DATA=true
     volumes:
       - ./data:/data
+    networks:
+      - dataops-assistant-net
 
   minio:
     image: minio/minio:latest
@@ -63,6 +70,8 @@ services:
     volumes:
       - minio_data:/data
     restart: unless-stopped
+    networks:
+      - dataops-assistant-net
 
   # ---------------- Postgres for DataOps Assistant ----------------
   postgres:
@@ -82,7 +91,12 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-
+    networks:
+      - dataops-assistant-net
 volumes:
   minio_data:
   postgres_data:
+
+networks:
+  dataops-assistant-net:
+    external: true

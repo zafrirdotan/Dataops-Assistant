@@ -1,18 +1,44 @@
 {
   "pipelines": [
     {
-      "id": "orders_daily",
-      "description": "ETL for orders",
-      "schedule": "0 2 * * *",
-      "mode": "incremental",
-      "tags": ["etl", "orders"]
+      "id": "ingest_csv_to_parquet_and_sqlite_20251023_1236_20251023_123623_d097432d-7",
+      "schedule": "48 12 * * *",
+      "description": "",
+      "tags": [],
+      "mode": "full",
+      "start_date": "2025-10-23T12:38:36.654906"
     },
     {
-      "id": "users_hourly",
-      "description": "ETL for users",
-      "schedule": "0 * * * *",
+      "id": "ingest_csv_to_parquet_and_sqlite_20251023_1236_20251023_1236d-7",
+      "schedule": "48 12 * * *",
+      "description": "",
+      "tags": [],
       "mode": "full",
-      "tags": ["etl", "users"]
+      "start_date": "2025-10-23T12:38:36.654906"
+    },
+    {
+      "id": "ingest_csv_to_parquet_and_sqlite_20251023_1806_20251023_180632_bff86804",
+      "schedule": "0 2 * * *",
+      "description": "",
+      "tags": [],
+      "mode": "full",
+      "start_date": "2025-10-23T18:08:11.921596"
+    },
+    {
+      "id": "ingest_csv_to_parquet_and_sqlite_20251023_1811_20251023_181206_d82f3631",
+      "schedule": "20 21 * * *",
+      "description": "",
+      "tags": [],
+      "mode": "full",
+      "start_date": "2025-10-23T18:13:46.867697"
+    },
+    {
+      "id": "ingest_csv_to_parquet_and_sqlite_20251023_1816_20251023_181631_bcbdcbfb",
+      "schedule": "20 18 * * *",
+      "description": "",
+      "tags": [],
+      "mode": "full",
+      "start_date": "2025-10-23T18:18:07.218121"
     }
   ]
 }

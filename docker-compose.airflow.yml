@@ -3,6 +3,10 @@ volumes:
   airflow-db:
   app-db:
 
+networks:
+  dataops-assistant-net:
+    external: true
+
 x-airflow-common: &airflow-common
   image: apache/airflow:3.1.0
   environment:
@@ -10,12 +14,15 @@ x-airflow-common: &airflow-common
     AIRFLOW__CORE__EXECUTOR: LocalExecutor
     AIRFLOW__CORE__LOAD_EXAMPLES: "false"
     AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "true"
-    AIRFLOW__SCHEDULER__DAG_DIR_LIST_INTERVAL: 10
+    AIRFLOW__SCHEDULER__REFRESH_INTERVAL: 10
     # --- Airflow metadata DB (separate from your app DB) ---
     AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-postgres:5432/airflow
     # --- Your app DB connection (available to tasks) ---
     DATABASE_URL: postgresql://dataops_user:dataops_password@postgres:5432/dataops_db
     AIRFLOW_CONN_APP_DB: postgresql+psycopg2://dataops_user:dataops_password@postgres:5432/dataops_db
+    AIRFLOW_CONN_DATAOPS_ASSISTANT: http://dataops-assistant:80
+    AIRFLOW__SDK__ENABLED: "true"
+
   user: "${AIRFLOW_UID:-50000}:${AIRFLOW_GID:-0}"
   volumes:
     - ./airflow/dags:/opt/airflow/dags
@@ -27,6 +34,8 @@ x-airflow-common: &airflow-common
   depends_on:
     airflow-postgres:
       condition: service_healthy
+  networks:
+    - dataops-assistant-net
 
 services:
   # ---------------- App Postgres (for your ETL/data) ----------------
@@ -46,6 +55,8 @@ services:
     volumes:
       - airflow-db:/var/lib/postgresql/data
       - ./airflow/dags/pipelines/catalog.json:/opt/airflow/dags/pipelines/catalog.json
+    networks:
+      - dataops-assistant-net
 
   # ---------------- One-time DB init & user ----------------
   airflow-init:
