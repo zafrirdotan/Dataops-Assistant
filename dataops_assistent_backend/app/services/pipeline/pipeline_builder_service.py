@@ -108,6 +108,12 @@ class PipelineBuilderService:
                     pipeline_id,  # Pass pipeline_id instead of folder path
                 )
                 self.log.info(f"Test result: {test_result}")
+                if not test_result.get("success"):
+                    self.log.error("Pipeline tests failed.", test_result)
+                    return {
+                        "success": False,
+                        "error": "Pipeline tests failed.",
+                    }
             except Exception as e:
                 self.log.error(f"Failed to run pipeline tests: {e}")
                 test_result = {"success": False, "details": f"Test execution failed: {e}"}
@@ -117,20 +123,33 @@ class PipelineBuilderService:
             # Step 8: Dockerize and deploy the pipeline
             self.log.info("Dockerizing and deploying the pipeline...")
             dockerize_result = await self.dockerize_service.dockerize_pipeline(pipeline_id)
+            if not dockerize_result.get("success"):
+                self.log.error("Dockerization failed.", dockerize_result)
+                return {
+                    "success": False,
+                    "error": "Dockerization failed.",
+                }
+
 
             # Step 9: Save pipeline to catalog.json for Airflow scheduling
             scheduled_result = await self.scheduler_service.save_pipeline_to_catalog(
                 pipeline_id,
                 spec
             )
-         
-            # Step 9: e2e testing
+
+            if not scheduled_result.get("success"):
+                self.log.error("Scheduling failed.", scheduled_result)
+                return {
+                    "success": False,
+                    "error": "Scheduling failed.",
+                }
+            # TODO: Step 9: e2e testing
+
+
             execution_time = (datetime.datetime.now() - start_time).seconds
             message = f"Template-based pipeline created successfully in {execution_time} seconds"
             
-            self.log.info(message)
-            
-            return {
+            response = {
                 "success": True,
                 "pipeline_id": pipeline_id,  # Add pipeline_id to response
                 "spec": spec,
@@ -140,6 +159,10 @@ class PipelineBuilderService:
                 "scheduling_result": scheduled_result
             }
             
+            self.log.info(f"Pipeline creation successful: {response}")
+
+            return response
+
         except Exception as e:
             self.log.error(f"Template-based pipeline creation failed: {e}")
             return {

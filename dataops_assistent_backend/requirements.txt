@@ -22,3 +22,6 @@ asyncpg>=0.29.0
 aiofiles>=23.0.0
 
 docker
+
+# Elasticsearch dependencies
+elasticsearch>=8.12.0

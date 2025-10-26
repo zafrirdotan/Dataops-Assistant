@@ -39,6 +39,22 @@
       "tags": [],
       "mode": "full",
       "start_date": "2025-10-23T18:18:07.218121"
+    },
+    {
+      "id": "merge_transactions_by_txn_id_20251026_1033_20251026_103347_7369e55e",
+      "schedule": "0 0 * * *",
+      "description": "",
+      "tags": [],
+      "mode": "full",
+      "start_date": "2025-10-26T10:35:26.489395"
+    },
+    {
+      "id": "ingest_csv_to_parquet_and_sqlite_20251026_1111_20251026_111216_df268320",
+      "schedule": "20 18 * * *",
+      "description": "",
+      "tags": [],
+      "mode": "full",
+      "start_date": "2025-10-26T11:14:02.873468"
     }
   ]
 }
