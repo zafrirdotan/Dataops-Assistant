@@ -7,6 +7,7 @@ def test_endpoint():
     response = requests.get("http://dataops-assistant:80")
     assert response.status_code == 200, f"Status code: {response.status_code}"
     print("Response:", response.text)
+    print("DataOps Assistant endpoint is reachable.")
 
 with DAG(
     dag_id="test_dataops_assistant_endpoint",
