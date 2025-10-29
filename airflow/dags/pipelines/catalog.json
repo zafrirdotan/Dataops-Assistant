@@ -1,12 +1,20 @@
 {
   "pipelines": [
     {
-      "id": "ingest_csv_to_parquet_and_sqlite_20251028_1232_20251028_123324_85b7f646",
-      "schedule": "20 18 * * *",
+      "id": "ingest_orders_daily_20251029_1056_20251029_105638_c6c82899",
+      "schedule": "0 2 * * *",
       "description": "",
       "tags": [],
       "mode": "full",
-      "start_date": "2025-10-28T12:33:52.867888"
+      "start_date": "2025-10-29T10:58:49.688731"
+    },
+    {
+      "id": "ingest_csv_to_parquet_and_sqlite_20251029_1103_20251029_110335_eb2a6387",
+      "schedule": "0 2 * * *",
+      "description": "",
+      "tags": [],
+      "mode": "full",
+      "start_date": "2025-10-29T11:04:32.251273"
     }
   ]
 }

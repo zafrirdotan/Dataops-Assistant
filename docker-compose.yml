@@ -27,9 +27,7 @@ services:
       - ./airflow/dags/pipelines/catalog.json:/app/catalog.json
 
     networks:
-      dataops-assistant-net:
-        aliases:
-          - dataops-assistant
+      - dataops-assistant-net
 
   data-loader:
     build: ./data-loader-service

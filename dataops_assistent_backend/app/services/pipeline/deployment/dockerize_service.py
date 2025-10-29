@@ -13,7 +13,7 @@ class DockerizeService:
         self.log = log
         self.output_service = PipelineOutputService()
         self.docker_client = docker.from_env()
-        self.network_name = "dataops-assistant_default"
+        self.network_name = "dataops-assistant-net"
 
     async def dockerize_pipeline(self, pipeline_id: str) -> dict:
         # Step 1: Retrieve pipeline files from MinIO
