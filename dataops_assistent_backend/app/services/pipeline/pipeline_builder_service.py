@@ -1,10 +1,7 @@
 import logging
 import jsonschema
-import pandas as pd
 import datetime
 
-
-from .guards.prompt_guard_service import PromptGuardService
 from app.services.llm_service import LLMService
 from .generators.pipeline_spec_generator import PipelineSpecGenerator
 from .generators.pipeline_code_generator_LLM_hybrid import PipelineCodeGeneratorLLMHybrid
@@ -20,7 +17,6 @@ class PipelineBuilderService:
     def __init__(self):
         self.log = logging.getLogger(__name__)
         logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-        self.guard = PromptGuardService()
         self.llm = LLMService()
         self.spec_gen = PipelineSpecGenerator()
         self.local_file_service = LocalFileService()
@@ -71,7 +67,6 @@ class PipelineBuilderService:
             # Step 1: Generate pipeline specification
             self.log.info("Generating pipeline specification...")
             spec = await self.spec_gen.generate_spec(user_input)
-            
             # Step 2: Validate schema
             self.log.info("Validating pipeline specification schema...")
             if not self.validate_spec_schema(spec):

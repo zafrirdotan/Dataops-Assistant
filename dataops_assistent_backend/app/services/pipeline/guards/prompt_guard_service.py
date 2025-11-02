@@ -2,12 +2,14 @@
 """
 Service for sanitation, guardrails, and validation of user input and LLM output.
 """
-from typing import Any
+import json
 
 # app/service.py
 import re
 import unicodedata
 from typing import Dict, List, Tuple
+
+from app.services.llm_service import LLMService
 
 # --- Normalization / Cleaning ---
 
@@ -93,6 +95,70 @@ SAFE_CHARS_RE = re.compile(r"^[\n\t\r a-zA-Z0-9_\-.,:;!?()\"'@#/$%&*+=<>[\]{}|\\
 class PromptGuardService:
     def __init__(self, allowlist_max_len: int = 2000):
         self.allowlist_max_len = allowlist_max_len
+        self.llm = LLMService()
+
+    async def llm_guard_check(self, cleaned: str) -> bool:
+        """ Checks if the input is meeting requirements and guardrails to pass through LLM guard """
+
+        prompt = f"""
+            You are a security guard for user inputs to a language model. Determine if the following input is safe to process: {cleaned}
+            The allowed source types are: 
+                - local files in json or csv format from ./data/.csv.
+                - PostgreSQL
+                - api endpoints
+                - No other source types are allowed.
+            The allowed destination types are: 
+                - PostgreSQL
+                - parquet files
+                - sqlite databases
+                - No other destination types are allowed.
+            The allowed operations are: 
+                - Extracting data from the source
+                - Transforming data according to the specified transformation logic
+                - Storing data in the destination
+            The allowed transformations are: 
+                - filtering rows
+                - adding calculated columns
+                - aggregating data
+            SQL allowed operations are 
+                - SELECT/PROJECT
+                - FILTER
+                - CAST
+                - JOIN (inner/left) on key
+                - GROUP BY aggregation
+                - Dedupe by key + latest updated_at
+            You are allowed to get data from the source input, to transform it according to the logic, and to store it in the destination.
+            If you get a request to get other data or to delete, drop, or modify data in the source or destination, you must block it."""
+
+        response = await self.llm.response_create_async(
+            input=prompt,
+            text={
+            "format": {
+                "type": "json_schema",
+                "name": "extract_json",
+                "schema": {
+                    "type": "object",
+                    "properties": {
+                        "is_safe": {
+                            "type": "boolean",
+                            "description": "Indicates if the input is safe to process."
+                        },
+                        "reason": {
+                            "type": "string",
+                            "description": "Explanation for the safety decision."
+                        }
+                    },
+                    "required": ["is_safe", "reason"],
+                    "additionalProperties": False
+                },
+                "strict": True,
+                }
+            }
+        )
+        print(response)  # For debugging purposes
+
+        return json.loads(response.output_text)
+
 
     def analyze(self, raw: str) -> Dict:
         cleaned = basic_clean(raw)
