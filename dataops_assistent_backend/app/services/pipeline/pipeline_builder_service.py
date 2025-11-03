@@ -114,10 +114,13 @@ class PipelineBuilderService:
             dockerize_result = await self.dockerize_service.dockerize_pipeline(pipeline_id)
 
             # Step 9: Save pipeline to catalog.json for Airflow scheduling
-            scheduled_result = await self.scheduler_service.save_pipeline_to_catalog(
-                pipeline_id,
-                spec
-            )
+            if spec.get("schedule") and spec.get("schedule") != "manual":
+                scheduled_result = await self.scheduler_service.save_pipeline_to_catalog(
+                    pipeline_id,
+                    spec
+                )
+            else:
+                scheduled_result = {"success": True, "details": "Pipeline set to manual schedule; not added to catalog."}
          
             # Step 9: e2e testing
             execution_time = (datetime.datetime.now() - start_time).seconds

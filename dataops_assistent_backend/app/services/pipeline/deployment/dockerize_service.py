@@ -1,6 +1,5 @@
 
 
-import logging
 import docker 
 import os
 import aiofiles
@@ -36,12 +35,6 @@ class DockerizeService:
                 requirements_file = os.path.join(build_dir, "requirements.txt")
                 env_file = os.path.join(build_dir, ".env")
                 dockerfile = os.path.join(build_dir, "Dockerfile")
-
-                # debug stored_files content data
-                # self.log.info(f"Stored files content keys: {list(stored_files.keys())}")
-                # self.log.info(f"Stored files content: {stored_files}")
-                self.log.info(f"Stored .env content: {stored_files.get('.env')}")
-
 
                 async with aiofiles.open(pipeline_file, 'w') as f:
                     await f.write(stored_files.get('code', ''))

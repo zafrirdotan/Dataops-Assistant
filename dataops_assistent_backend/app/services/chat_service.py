@@ -41,7 +41,8 @@ class ChatService:
         if not guardResponse.get("is_safe", False):
             return {
                 "decision": "block",
-                "error": f"Input blocked by LLM Guard: {guardResponse.get('reason', 'No reason provided')}"
+                "error": f"Input blocked by LLM Guard: {guardResponse.get('reason', 'No reason provided')}",
+                "findings": guardResponse.get("violations", [])
             }
 
         # Step 2: Generate pipeline

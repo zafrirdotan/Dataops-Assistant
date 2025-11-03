@@ -39,6 +39,7 @@ ETL_SPEC_SCHEMA = {
         "schedule": {
             "type": "string",
             "description": "Cron schedule for the pipeline",
+            "enum": ["manual", "0 2 * * *", "0 6 * * 1"] # manual, daily at 2am, weekly on Monday at 6am
         }
     },
     "required": ["pipeline_name", "source_type", "source_path", "source_table", "destination_type", "destination_name", "transformation_logic", "schedule"],

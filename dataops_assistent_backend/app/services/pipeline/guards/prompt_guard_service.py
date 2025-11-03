@@ -127,6 +127,10 @@ class PromptGuardService:
                 - JOIN (inner/left) on key
                 - GROUP BY aggregation
                 - Dedupe by key + latest updated_at
+            The Schedule options are:
+                - manual
+                - daily at 2am
+                - weekly on Monday at 6am
             You are allowed to get data from the source input, to transform it according to the logic, and to store it in the destination.
             If you get a request to get other data or to delete, drop, or modify data in the source or destination, you must block it."""
 
@@ -137,22 +141,41 @@ class PromptGuardService:
                 "type": "json_schema",
                 "name": "extract_json",
                 "schema": {
-                    "type": "object",
-                    "properties": {
-                        "is_safe": {
-                            "type": "boolean",
-                            "description": "Indicates if the input is safe to process."
-                        },
-                        "reason": {
-                            "type": "string",
-                            "description": "Explanation for the safety decision."
-                        }
+                "type": "object",
+                "properties": {
+                    "is_safe": {
+                    "type": "boolean",
+                    "description": "Indicates if the input is safe to process."
                     },
-                    "required": ["is_safe", "reason"],
-                    "additionalProperties": False
+                    "reason": {
+                    "type": "string",
+                    "description": "Explanation for the safety decision."
+                    },
+                    "violations": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "violation_type": {
+                                    "type": "string",
+                                    "enum": ["source_type", "destination_type", "operation", "transformation", "schedule"]
+                                },
+                                "value": {
+                                    "type": "string",
+                                    "description": "Specific value related to the defect type."
+                                }
+                            },
+                            "required": ["violation_type", "value"],
+                            "additionalProperties": False
+                        },
+                        "description": "List of properties that caused the input to be unsafe or not meet requirements."
+                    }
+                },
+                "required": ["is_safe", "reason", "violations"],
+                "additionalProperties": False
                 },
                 "strict": True,
-                }
+            }
             }
         )
         print(response)  # For debugging purposes
