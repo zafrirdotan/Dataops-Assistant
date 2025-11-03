@@ -101,17 +101,25 @@ class PipelineBuilderService:
             try:
                 test_result = await self.test_service.run_pipeline_test_in_venv(
                     pipeline_id,  # Pass pipeline_id instead of folder path
+                    spec
                 )
                 self.log.info(f"Test result: {test_result}")
             except Exception as e:
                 self.log.error(f"Failed to run pipeline tests: {e}")
                 test_result = {"success": False, "details": f"Test execution failed: {e}"}
 
+            if not test_result.get("success"):
+                self.log.error("Pipeline tests failed.")
+                return {
+                    "success": False,
+                    "error": "Pipeline tests failed.",
+                    "test_result": test_result
+                }
             # Step 7: Iterate to perfect the pipeline based on test results (if needed)
 
             # Step 8: Dockerize and deploy the pipeline
             self.log.info("Dockerizing and deploying the pipeline...")
-            dockerize_result = await self.dockerize_service.dockerize_pipeline(pipeline_id)
+            dockerize_result = await self.dockerize_service.build_pipeline_docker_image_and_test_it(pipeline_id, spec)
 
             # Step 9: Save pipeline to catalog.json for Airflow scheduling
             if spec.get("schedule") and spec.get("schedule") != "manual":

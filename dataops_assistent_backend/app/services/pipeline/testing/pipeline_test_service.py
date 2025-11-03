@@ -1,5 +1,4 @@
 import os
-import subprocess
 import sys
 import asyncio
 import tempfile
@@ -16,7 +15,7 @@ class PipelineTestService:
         self.log = log
         self.output_service = PipelineOutputService()
 
-    async def run_pipeline_test_in_venv(self, pipeline_id: str) -> dict:
+    async def run_pipeline_test_in_venv(self, pipeline_id: str, spec: dict) -> dict:
         """
         Run the pipeline test in a virtual environment.
         """
@@ -69,61 +68,86 @@ class PipelineTestService:
             # Create virtual environment
             venv_dir = os.path.join(execution_dir, 'venv')
             try:
-                subprocess.run([sys.executable, '-m', 'venv', venv_dir], check=True)
+                proc = await asyncio.create_subprocess_exec(
+                    sys.executable, '-m', 'venv', venv_dir,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE
+                )
+                stdout, stderr = await proc.communicate()
+                if proc.returncode != 0:
+                    self.log.error(f"Failed to create virtual environment: {stderr.decode()}")
+                    return {"success": False, "details": f"Failed to create virtual environment: {stderr.decode()}"}
                 self.log.info(f"Virtual environment created at {venv_dir}")
-            except subprocess.CalledProcessError as e:
+            except Exception as e:
                 self.log.error(f"Failed to create virtual environment: {e}")
                 return {"success": False, "details": f"Failed to create virtual environment: {e}"}
             
             # Install dependencies
             pip_executable = os.path.join(venv_dir, 'bin', 'pip')
             try:
-                subprocess.run([pip_executable, 'install', '-r', requirements_file], check=True)
+                proc = await asyncio.create_subprocess_exec(
+                    pip_executable, 'install', '-r', requirements_file,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE
+                )
+                stdout, stderr = await proc.communicate()
+                if proc.returncode != 0:
+                    self.log.error(f"Failed to install dependencies: {stderr.decode()}")
+                    return {"success": False, "details": f"Failed to install dependencies: {stderr.decode()}"}
                 self.log.info("Dependencies installed successfully")
-            except subprocess.CalledProcessError as e:
+            except Exception as e:
                 self.log.error(f"Failed to install dependencies: {e}")
                 return {"success": False, "details": f"Failed to install dependencies: {e}"}
             
             # Run tests
             pytest_executable = os.path.join(venv_dir, 'bin', 'pytest')
             try:
-                result = subprocess.run([pytest_executable, test_file], capture_output=True, text=True)
-                if result.returncode == 0:
+                proc = await asyncio.create_subprocess_exec(
+                    pytest_executable, test_file,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE
+                )
+                stdout, stderr = await proc.communicate()
+                if proc.returncode == 0:
                     self.log.info("All tests passed successfully")
                 else:
-                    self.log.error(f"Tests failed:\n{result.stdout}\n{result.stderr}")
-                    return {"success": False, "details": f"Tests failed:\n{result.stdout}\n{result.stderr}"}
-            except subprocess.CalledProcessError as e:
+                    self.log.error(f"Tests failed:\n{stdout.decode()}\n{stderr.decode()}")
+                    return {"success": False, "details": f"Tests failed:\n{stdout.decode()}\n{stderr.decode()}"}
+            except Exception as e:
                 self.log.error(f"Failed to run tests: {e}")
                 return {"success": False, "details": f"Failed to run tests: {e}"}
             
             # Run pipeline code and check for errors in stdout/stderr
             try:
                 python_executable = os.path.join(venv_dir, 'bin', 'python')
-                result = subprocess.run([python_executable, pipeline_file], capture_output=True, text=True)
-                stdout_lower = result.stdout.lower() if result.stdout else ''
-                stderr_lower = result.stderr.lower() if result.stderr else ''
+                proc = await asyncio.create_subprocess_exec(
+                    python_executable, pipeline_file,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE
+                )
+                    
+                stdout, stderr = await proc.communicate()
+                stdout_lower = stdout.decode().lower() if stdout else ''
+                stderr_lower = stderr.decode().lower() if stderr else ''
                 error_keywords = ['error', 'exception', 'traceback', 'fail']
                 found_error = any(kw in stdout_lower or kw in stderr_lower for kw in error_keywords)
-                if result.returncode == 0 and not found_error:
+                
+                if spec.get("destination_type") in ["sqlite", "parquet"]:
+                    await self.output_service.clean_output_files(spec)
+                    self.log.info("Cleaned up output files for SQLite/Parquet destination.")
+                
+                if proc.returncode == 0 and not found_error:
                     self.log.info("Pipeline executed successfully")
                     return {"success": True, "details": "Pipeline executed successfully"}
                 elif found_error:
-                    self.log.error(f"Pipeline execution completed but errors detected in output:\n{result.stdout}\n{result.stderr}")
-                    return {"success": False, "details": f"Pipeline execution completed but errors detected in output:\n{result.stdout}\n{result.stderr}"}
+                    self.log.error(f"Pipeline execution completed but errors detected in output:\n{stdout.decode()}\n{stderr.decode()}")
+                    return {"success": False, "details": f"Pipeline execution completed but errors detected in output:\n{stdout.decode()}\n{stderr.decode()}"}
                 else:
-                    self.log.error(f"Pipeline execution failed:\n{result.stdout}\n{result.stderr}")
-                    return {"success": False, "details": f"Pipeline execution failed:\n{result.stdout}\n{result.stderr}"}
-            except subprocess.CalledProcessError as e:
+                    self.log.error(f"Pipeline execution failed:\n{stdout.decode()}\n{stderr.decode()}")
+                    return {"success": False, "details": f"Pipeline execution failed:\n{stdout.decode()}\n{stderr.decode()}"}
+            except Exception as e:
                 self.log.error(f"Failed to execute pipeline: {e}")
                 return {"success": False, "details": f"Failed to execute pipeline: {e}"}
             
         return {"success": False, "details": "Unexpected error during pipeline testing."}
-   
 
-
-
-
-            
-
-    

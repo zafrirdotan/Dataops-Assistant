@@ -41,7 +41,6 @@ class PipelineCodeGeneratorLLMHybrid:
         """
 
         try:
-            # self.log.info(f"Generating code with prompt: {prompt}")
             response = await self.llm.response_create_async(input = prompt)
         except Exception as e:
             self.log.error(f"Error generating code: {e}")
@@ -412,26 +411,3 @@ if __name__ == "__main__":
             cleaned_lines.append(cleaned_line)
         
         return '\n'.join(cleaned_lines).replace("```", "")
-    
-    
-    #  from minio import Minio 
-    # # MinIO configuration from environment variables
-    #     minio_endpoint = os.getenv('MINIO_ENDPOINT')
-    #     minio_access_key = os.getenv('MINIO_ACCESS_KEY')
-    #     minio_secret_key = os.getenv('MINIO_SECRET_KEY')
-    #     minio_bucket = os.getenv('MINIO_BUCKET', 'default-bucket')
-
-    #     minio_client = Minio(
-    #         minio_endpoint,
-    #         access_key=minio_access_key,
-    #         secret_key=minio_secret_key,
-    #         secure=False  # Set to True if using HTTPS
-    #     )
-
-    #     # Upload the file
-    #     minio_client.fput_object(
-    #         minio_bucket,
-    #         'output.parquet',
-    #         output_path
-    #     )
-    #     # logging.info(f"Saved Parquet to MinIO bucket {minio_bucket}")

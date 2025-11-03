@@ -4,6 +4,7 @@ import docker
 import os
 import aiofiles
 import shutil
+import asyncio
 
 from ..deployment.pipeline_output_service import PipelineOutputService
 class DockerizeService:
@@ -53,7 +54,6 @@ class DockerizeService:
                 self.log.error(f"Failed to save pipeline files to build context: {e}")
                 return {"success": False, "details": f"Failed to save pipeline files: {e}"}
             
-
             # Step 3: Build Docker image
             try:
                 image_tag = f"pipeline-{pipeline_id}:latest"
@@ -75,37 +75,36 @@ class DockerizeService:
         
             # Step 4: Run the container and connect it to the network
             try:
-
                 host_data_path = os.getenv("HOST_DATA_PATH", "/Users/yourusername/project/data")
                 host_output_path = os.getenv("HOST_OUTPUT_PATH", "/Users/yourusername/project/output")
 
-                container = self.docker_client.containers.run(
+                container = await asyncio.to_thread(
+                    self.docker_client.containers.run,
                     image_tag,
                     detach=True,
                     network=self.network_name,
                     name=container_name,
                     volumes={
-                            os.path.abspath(host_data_path): {"bind": "/app/data", "mode": "ro"},
-                            os.path.abspath(host_output_path): {"bind": "/app/output", "mode": "rw"},
-                        },
-                    # remove=True,
-                    labels={"app": "dataops-assistant", "pipeline_id": pipeline_id}, 
-                    # auto_remove=True
-
+                        os.path.abspath(host_data_path): {"bind": "/app/data", "mode": "ro"},
+                        os.path.abspath(host_output_path): {"bind": "/app/output", "mode": "rw"},
+                    },
+                    labels={"app": "dataops-assistant", "pipeline_id": pipeline_id},
                 )
 
-                self.docker_client.containers.prune(filters={"label": "app=dataops-assistant"})
+                await asyncio.to_thread(self.docker_client.containers.prune, filters={"label": "app=dataops-assistant"})
 
                 self.log.info(f"Docker container started for pipeline ID: {pipeline_id}, Container ID: {container.id}")
 
                 # Remove the container and image after running
-                container.wait()  # Wait for the container to finish
-                
-                logs = container.logs().decode('utf-8')
+                await asyncio.to_thread(container.wait)
+                logs = await asyncio.to_thread(container.logs)
+                logs = logs.decode('utf-8')
                 self.log.info(f"Container logs:\n{logs}")
 
-                container.remove(force=True)
-                self.docker_client.images.remove(image=image_tag, force=True)
+                await asyncio.to_thread(container.remove, force=True)
+                await asyncio.to_thread(self.docker_client.images.remove, image=image_tag, force=True)
+                self.log.info(f"Cleaned up container and image for pipeline ID: {pipeline_id}")
+
             except Exception as e:
                 self.log.error(f"Failed to start Docker container: {e}")
                 return {"success": False, "details": f"Failed to start Docker container: {e}"}
@@ -119,3 +118,10 @@ class DockerizeService:
             except Exception as cleanup_error:
                 self.log.error(f"Failed to clean up build directory: {cleanup_error}")
 
+    async def build_pipeline_docker_image_and_test_it(self, pipeline_id: str, spec: dict) -> dict:
+        """Wrapper method to build and dockerize the pipeline."""
+        result = await self.dockerize_pipeline(pipeline_id)
+        # Clean up output files related to the pipeline
+        await self.output_service.clean_output_files(spec)
+        self.log.info(f"Cleaned up output files after testing docker image for pipeline ID: {pipeline_id}")
+        return result

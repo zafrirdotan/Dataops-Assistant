@@ -5,6 +5,7 @@ import logging
 import datetime
 import uuid
 import json
+import fnmatch
 from typing import Dict, Any
 from app.services.storage_service import MinioStorage
 from ..types import CodeGenResult
@@ -126,3 +127,50 @@ class PipelineOutputService:
         except Exception as e:
             self.log.error(f"Failed to retrieve pipeline files from MinIO: {e}")
             return {}    
+
+    async def clean_output_files(self, spec: dict):
+        """
+        Clean up any output files generated during pipeline execution.
+        Scans ../output (relative to current working directory) and removes files or directories
+        whose name matches or contains entries from spec["destination_name"].
+        Returns a list of removed paths.
+        """
+
+        output_dir = os.path.abspath(os.path.join(os.getcwd(), 'output'))
+        name = spec.get("destination_name")
+        if not name:
+            self.log.info("No destination_name provided in spec; nothing to remove.")
+            return []
+
+        if not os.path.isdir(output_dir):
+            self.log.info(f"No output directory found at {output_dir}")
+            return []
+
+        removed_paths = []
+        patterns = [f"{name}.parquet", f"{name}.db", f"{name}.sqlite"]
+
+        entries = await asyncio.to_thread(os.listdir, output_dir)
+        print("Output directory entries:", entries)
+        for entry in entries:
+            for pattern in patterns:
+                if not pattern:
+                    continue
+                # match exact, substring or glob pattern
+                if entry == pattern or pattern in entry or fnmatch.fnmatch(entry, pattern):
+                    path = os.path.join(output_dir, entry)
+                    try:
+                        if os.path.isfile(path) or os.path.islink(path):
+                            await asyncio.to_thread(os.remove, path)
+                            print(f"Removed output file: {path}")
+                            self.log.info(f"Removed output file: {path}")
+                        elif os.path.isdir(path):
+                            # shutil.rmtree is not async, so use asyncio.to_thread
+                            await asyncio.to_thread(shutil.rmtree, path)
+                            print(f"Removed output directory: {path}")
+                            self.log.info(f"Removed output directory: {path}")
+                        removed_paths.append(path)
+                    except Exception as e:
+                        self.log.error(f"Failed to remove output {path}: {e}")
+                    break
+        
+        return removed_paths
