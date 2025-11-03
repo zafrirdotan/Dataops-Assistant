@@ -10,6 +10,10 @@ ETL_SPEC_SCHEMA = {
             "type": "string",
             "description": "A name for the pipeline in snake_case format",
         },
+        "description": {
+            "type": "string",
+            "description": "A brief description of the pipeline's purpose based on user input",
+        },
         "source_type": {
             "type": "string",
             "description": "The source of the data",
@@ -42,7 +46,7 @@ ETL_SPEC_SCHEMA = {
             "enum": ["manual", "0 2 * * *", "0 6 * * 1"] # manual, daily at 2am, weekly on Monday at 6am
         }
     },
-    "required": ["pipeline_name", "source_type", "source_path", "source_table", "destination_type", "destination_name", "transformation_logic", "schedule"],
+    "required": ["pipeline_name", "source_type", "source_path", "source_table", "destination_type", "destination_name", "transformation_logic", "schedule", "description"],
     "additionalProperties": False,
 }
 class PipelineSpecGenerator:

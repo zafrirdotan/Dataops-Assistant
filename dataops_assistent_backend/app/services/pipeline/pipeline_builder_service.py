@@ -3,6 +3,7 @@ import jsonschema
 import datetime
 
 from app.services.llm_service import LLMService
+from app.services.pipeline.registry.pipeline_registry_service import getPipelineRegistryService
 from .generators.pipeline_spec_generator import PipelineSpecGenerator
 from .generators.pipeline_code_generator_LLM_hybrid import PipelineCodeGeneratorLLMHybrid
 from .generators.pipeline_spec_generator import ETL_SPEC_SCHEMA
@@ -27,6 +28,7 @@ class PipelineBuilderService:
         self.source_service = SourceService(self.log)
         self.dockerize_service = DockerizeService(self.log)
         self.scheduler_service = SchedulerService(self.log)
+        self.pipeline_registry = getPipelineRegistryService()
 
 
     def validate_spec_schema(self, spec: dict) -> bool:
@@ -115,6 +117,16 @@ class PipelineBuilderService:
                     "error": "Pipeline tests failed.",
                     "test_result": test_result
                 }
+            
+            # Register pipeline in the registry if tests passed
+            if test_result.get("success"):
+                self.pipeline_registry.create_pipeline(
+                    pipeline_id=pipeline_id,
+                    name=spec.get("pipeline_name"),
+                    created_by=spec.get("created_by", "unknown"),
+                    description=spec.get("description", ""),
+                    spec=spec
+                )
             # Step 7: Iterate to perfect the pipeline based on test results (if needed)
 
             # Step 8: Dockerize and deploy the pipeline

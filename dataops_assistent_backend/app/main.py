@@ -6,6 +6,8 @@ from app.services.storage_service import MinioStorage
 from app.services.database_service import get_database_service
 import logging
 
+from app.services.pipeline.registry.pipeline_registry_service import getPipelineRegistryService
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -13,6 +15,7 @@ logger = logging.getLogger(__name__)
 try:
     storage_service = MinioStorage()
     database_service = get_database_service()
+    pipeline_registry_service = getPipelineRegistryService()
 except Exception as e:
     logger.error(f"Error initializing services: {e}")
 
@@ -73,7 +76,13 @@ async def health_check():
             health_status["components"]["database"] = "unhealthy"
     except Exception as e:
         health_status["components"]["database"] = "unhealthy"
-    
+
+    try:
+        pipeline_registry_service.engine.connect()
+        health_status["components"]["pipeline_registry"] = "healthy"
+    except Exception as e:
+        health_status["components"]["pipeline_registry"] = "unhealthy"
+
     # Check storage (MinIO) connection
     try:
         storage_status = await storage_service.get_storage_status()
