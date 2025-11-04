@@ -120,20 +120,34 @@ class PipelineBuilderService:
             
             # Register pipeline in the registry if tests passed
             if test_result.get("success"):
-                self.pipeline_registry.create_pipeline(
+                await self.pipeline_registry.create_pipeline(
                     pipeline_id=pipeline_id,
                     name=spec.get("pipeline_name"),
                     created_by=spec.get("created_by", "unknown"),
                     description=spec.get("description", ""),
                     spec=spec
                 )
+                self.log.info(f"Pipeline {pipeline_id} registered successfully.")
             # Step 7: Iterate to perfect the pipeline based on test results (if needed)
 
             # Step 8: Dockerize and deploy the pipeline
-            self.log.info("Dockerizing and deploying the pipeline...")
-            dockerize_result = await self.dockerize_service.build_pipeline_docker_image_and_test_it(pipeline_id, spec)
-
-            # Step 9: Save pipeline to catalog.json for Airflow scheduling
+            try:
+                self.log.info("Dockerizing and deploying the pipeline...")
+                dockerize_result = await self.dockerize_service.build_pipeline_docker_image_and_test_it(pipeline_id, spec)
+                self.log.info(f"Dockerize result: {dockerize_result}")
+            except Exception as e:
+                self.log.error(f"Failed to dockerize the pipeline: {e}")
+                return {"success": False, "details": f"Failed to dockerize the pipeline: {e}"}
+            if not dockerize_result.get("success"):
+                self.log.error("Dockerization failed.")
+                return {
+                    "success": False,
+                    "pipeline_id": pipeline_id,
+                    "error": "Dockerization failed.",
+                    "dockerize_result": dockerize_result
+                }
+            
+            # Step 9: Scheduling in airflow
             if spec.get("schedule") and spec.get("schedule") != "manual":
                 scheduled_result = await self.scheduler_service.save_pipeline_to_catalog(
                     pipeline_id,
@@ -141,18 +155,25 @@ class PipelineBuilderService:
                 )
             else:
                 scheduled_result = {"success": True, "details": "Pipeline set to manual schedule; not added to catalog."}
-         
+
+            await self.pipeline_registry.update_pipeline(
+                pipeline_id,
+                {
+                    "status": "deployed"
+                }
+            )
+
             # Step 9: e2e testing
             execution_time = (datetime.datetime.now() - start_time).seconds
-            message = f"Template-based pipeline created successfully in {execution_time} seconds"
+            message = f"Pipeline created successfully in {execution_time} seconds"
             
             self.log.info(message)
             
             return {
                 "success": True,
-                "pipeline_id": pipeline_id,  # Add pipeline_id to response
+                "pipeline_id": pipeline_id, 
                 "spec": spec,
-                "test_result": test_result,    # Test execution results
+                "test_result": test_result,
                 "message": message,
                 "dockerize_result": dockerize_result,
                 "scheduling_result": scheduled_result

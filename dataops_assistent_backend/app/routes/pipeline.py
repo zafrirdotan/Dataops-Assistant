@@ -28,15 +28,15 @@ async def trigger_pipeline(pipeline_id: str):
         return {"status": "error", "message": str(e)}
 
 @router.get("/pipeline/{pipeline_id}")
-def get_pipeline(pipeline_id: str):
-    pipeline = pipeline_registry.get_pipeline(pipeline_id)
+async def get_pipeline(pipeline_id: str):
+    pipeline = await pipeline_registry.get_pipeline(pipeline_id)
     if not pipeline:
         raise HTTPException(status_code=404, detail="Pipeline not found")
     # If using SQLAlchemy model, convert to dict
     return pipeline.__dict__ if hasattr(pipeline, "__dict__") else pipeline
 
 @router.get("/pipelines")
-def get_pipelines():
-    pipelines = pipeline_registry.list_pipelines()
+async def get_pipelines():
+    pipelines = await pipeline_registry.list_pipelines()
     # Convert each to dict if needed
     return [p.__dict__ if hasattr(p, "__dict__") else p for p in pipelines]
