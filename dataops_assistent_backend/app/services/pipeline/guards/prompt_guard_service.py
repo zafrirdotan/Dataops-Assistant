@@ -101,38 +101,60 @@ class PromptGuardService:
         """ Checks if the input is meeting requirements and guardrails to pass through LLM guard """
 
         prompt = f"""
-            You are a security guard for user inputs to a language model. Determine if the following input is safe to process: {cleaned}
-            The allowed source types are: 
-                - local files in json or csv format from ./data/.csv.
-                - PostgreSQL
-                - api endpoints
-                - No other source types are allowed.
-            The allowed destination types are: 
-                - PostgreSQL
-                - parquet files
-                - sqlite databases
-                - No other destination types are allowed.
-            The allowed operations are: 
-                - Extracting data from the source
-                - Transforming data according to the specified transformation logic
-                - Storing data in the destination
-            The allowed transformations are: 
-                - filtering rows
-                - adding calculated columns
-                - aggregating data
-            SQL allowed operations are 
-                - SELECT/PROJECT
-                - FILTER
-                - CAST
-                - JOIN (inner/left) on key
-                - GROUP BY aggregation
-                - Dedupe by key + latest updated_at
-            The Schedule options are:
-                - manual
-                - daily at 2am
-                - weekly on Monday at 6am
-            You are allowed to get data from the source input, to transform it according to the logic, and to store it in the destination.
-            If you get a request to get other data or to delete, drop, or modify data in the source or destination, you must block it."""
+You are a security guard for user inputs to a language model. Determine if the following input is safe to process: {cleaned}
+
+Allowed source types:
+  - Local files (CSV or JSON) from ./data/
+  - PostgreSQL
+  - API endpoints
+  - No other sources are allowed.
+
+Allowed destination types:
+  - PostgreSQL
+  - Parquet files
+  - SQLite databases
+  - No other destinations are allowed.
+
+Allowed operations:
+  - Extracting data from the source
+  - Transforming data according to the specified transformation logic
+  - Storing data in the destination
+  - Performing **merge (upsert)** operations into destinations by key
+    (e.g. `merge into dw.fact_transactions by txn_id`).
+    Merge is considered a safe load operation, not a transformation.
+
+Allowed transformations:
+  - Filtering rows
+  - Adding calculated columns
+  - Aggregating data
+
+Allowed SQL operations:
+  - SELECT / PROJECT
+  - FILTER
+  - CAST
+  - JOIN (inner/left) on key
+  - GROUP BY aggregation
+  - DEDUPE by key + latest updated_at
+
+Allowed schedules:
+  - manual
+  - daily at 2am
+  - weekly on Monday at 6am
+
+You are allowed to get data from the source, transform it according to the logic,
+and store (including merge/upsert) it into the destination.
+
+You must block any request that tries to:
+  - delete, truncate, or drop tables
+  - modify schemas, users, or permissions
+  - perform destructive updates
+  - use destinations or sources not listed above
+  - execute arbitrary SQL beyond the allowed operations
+  - merge without specifying a key
+
+Example of allowed merge:
+  "From Postgres table public.transactions, merge into Postgres dw.fact_transactions by txn_id."
+"""
 
         response = await self.llm.response_create_async(
             input=prompt,

@@ -132,10 +132,10 @@ class MinioStorage:
             
             pipeline_path = f"{pipeline_id}/v{timestamp}"
             # Store pipeline code
-            if 'code' in pipeline_data:
+            if 'pipeline' in pipeline_data:
                 code_path = f"{pipeline_path}/pipeline.py"
-                await self._store_text_file("pipeline-code", code_path, pipeline_data['code'])
-                stored_files['code'] = f"s3://pipeline-code/{code_path}"
+                await self._store_text_file("pipeline-code", code_path, pipeline_data['pipeline'])
+                stored_files['pipeline'] = f"s3://pipeline-code/{code_path}"
             
             # Store requirements.txt
             if 'requirements' in pipeline_data:

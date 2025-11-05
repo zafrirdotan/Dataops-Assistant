@@ -129,15 +129,23 @@ class PipelineBuilderService:
             
             # Register pipeline in the registry if tests passed
             if test_result.get("success"):
-                await self.pipeline_registry.create_pipeline(
+                logging.info("Registering pipeline in the registry...")
+                build_step = "register_pipeline"
+                try:
+                    await self.pipeline_registry.create_pipeline(
                     pipeline_id=pipeline_id,
                     name=spec.get("pipeline_name"),
                     created_by=spec.get("created_by", "unknown"),
                     description=spec.get("description", ""),
                     spec=spec
-                )
-                self.log.info(f"Pipeline {pipeline_id} registered successfully.")
+                    )
+                    self.log.info(f"Pipeline {pipeline_id} registered successfully.")
+                except Exception as e:
+                    self.log.error(f"Failed to register pipeline: {e}")
+                    return {"success": False, "details": f"Failed to register pipeline: {e}"}
+                
             # Step 7: Iterate to perfect the pipeline based on test results (if needed)
+             # temporarily disabled for faster iteration
 
             # Step 8: Dockerize and deploy the pipeline
             build_step = "dockerize_pipeline"
@@ -191,7 +199,7 @@ class PipelineBuilderService:
                 "spec": spec,
                 "test_result": test_result,
                 "message": message,
-                "dockerize_result": dockerize_result,
+                "dockerize_result": dockerize_result ,
                 "scheduling_result": scheduled_result
             }
             
@@ -200,7 +208,7 @@ class PipelineBuilderService:
             return {
                 "success": False,
                 "pipeline_name": spec.get("pipeline_name"),
-                "pipeline_id": pipeline_id,
+                "pipeline_id": pipeline_id if 'pipeline_id' in locals() else None,
                 "build_steps_completed": build_step,
                 "error": str(e),
                 "message": f"Failed to create pipeline: {e}"

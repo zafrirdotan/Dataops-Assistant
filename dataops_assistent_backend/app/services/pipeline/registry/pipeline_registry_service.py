@@ -8,7 +8,7 @@ from sqlalchemy.future import select
 from app.models.pipeline import Pipeline, Base
 
 load_dotenv()
-DB_URL = os.getenv("ASYNC_DATABASE_URL", "postgresql+asyncpg://dataops_user:dataops_password@localhost:5432/dataops_db")
+DB_URL = os.getenv("ASYNC_DATABASE_URL", "postgresql+asyncpg://dataops_user:dataops_password@postgres:5432/dataops_db")
 
 class PipelineRegistryService:
     """Async service to manage pipeline registry and metadata in PostgreSQL."""

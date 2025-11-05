@@ -54,7 +54,7 @@ class PipelineOutputService:
                 return str(val)
 
             pipeline_data = {
-                "code": ensure_str(code["code"]),
+                "pipeline": ensure_str(code["pipeline"]),
                 "test_code": ensure_str(code["tests"]),
                 "requirements": ensure_str(code["requirements"]),
                 "created_at": datetime.datetime.now().isoformat(),

@@ -38,7 +38,7 @@ class DockerizeService:
                 dockerfile = os.path.join(build_dir, "Dockerfile")
 
                 async with aiofiles.open(pipeline_file, 'w') as f:
-                    await f.write(stored_files.get('code', ''))
+                    await f.write(stored_files.get('pipeline', ''))
 
                 async with aiofiles.open(requirements_file, 'w') as f:
                     await f.write(stored_files.get('requirements', ''))

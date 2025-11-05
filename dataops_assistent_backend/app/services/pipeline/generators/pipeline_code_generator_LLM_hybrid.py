@@ -38,18 +38,54 @@ class PipelineCodeGeneratorLLMHybrid:
 
         Use only the libraries specified in the requirements.txt.
         {self.generate_requirements_txt()}
+
+        Test Code:
+        This is an example of sanity test code for the pipeline:
+        {await self.generate_test_code(spec, pd.DataFrame())}
+        Follow this structure
+        Create some mock data to test the pipeline functions.
+        When cleaning up the output directory (e.g., output),
+        use shutil.rmtree with an onerror handler to handle files that are in use or locked.
+        Ensure all file handles are closed before attempting to delete the directory
+        Use only temporary directories (such as those provided by pytest’s tmp_path or Python’s tempfile module) for all test data and output.
+        Do not delete or clean up static/shared directories.
+        All test files and outputs should be created and removed automatically by the temporary directory context.
+        when testing the output as postgresql, use postgresql to test not sqlite.
+
+        Output code, requirements.txt, and test code only in your response.
         """
 
         try:
-            response = await self.llm.response_create_async(input = prompt)
+            response = await self.llm.response_create_async(
+                input = prompt,
+                text={
+                "format": {
+                    "type": "json_schema",
+                    "name": "extract_json",
+                    "strict": True,
+                    "schema": {
+                        "type": "object",
+                        "properties": {
+                            "pipeline": {"type": "string"},
+                            "requirements": {"type": "string"},
+                            "tests": {"type": "string"}
+                        },                       
+                        "required": ["pipeline", "requirements", "tests"],
+                        "additionalProperties": False
+                    }
+                }
+            })
+
         except Exception as e:
             self.log.error(f"Error generating code: {e}")
             return ""
-
+        print("Open ai Response:", response)  # For debugging purposes
+        json_response = json.loads(response.output_text)
+        
         return {
-            "code": self._clean_generated_code(response.output_text),
-            "requirements": self.generate_requirements_txt(),
-            "tests": self._clean_generated_code(await self.generate_test_code(spec, db_info.get("data_preview")))
+            "pipeline": self._clean_generated_code(json_response.get("pipeline", "")),
+            "requirements": self._clean_generated_code(json_response.get("requirements", "")),
+            "tests": self._clean_generated_code(json_response.get("tests", ""))
         }
     
     def getImplementationInstructions(self, spec: dict) -> str:
@@ -124,8 +160,8 @@ class PipelineCodeGeneratorLLMHybrid:
                 "The output folder is specified in os.getenv('OUTPUT_FOLDER', './output'). "
             ),
             "sqlite": (
-                "The destination is a SQLite database. "
-                "The connection string is provided in os.getenv('DATABASE_URL'). "
+                "The destination is a SQLite files. "
+                 "The output folder is specified in os.getenv('OUTPUT_FOLDER', './output'). "
             ),
             "PostgreSQL": (
                 "The destination is a Postgres database. "
@@ -305,7 +341,9 @@ def load_data(data):
         def load_data(data):
             try:
                 output_folder = os.getenv('OUTPUT_FOLDER', './output')
-                os.makedirs(output_folder, exist_ok=True)
+                # Only create the directory if it does not exist
+                if not os.path.exists(output_folder):
+                    os.makedirs(output_folder)
                 output_path = os.path.join(output_folder, 'output.parquet')
                 data.to_parquet(output_path, index=False)
             except Exception as e:
@@ -315,10 +353,14 @@ def load_data(data):
             return """
 def load_data(data):
     try:
-        database_url = os.getenv('DATABASE_URL')
-        engine = create_engine(database_url)
+        output_folder = os.getenv('OUTPUT_FOLDER', './output')
+        # Only create the directory if it does not exist
+        if not os.path.exists(output_folder):
+            os.makedirs(output_folder)
         table_name = spec['destination_name']
-        data.to_sql(table_name, con=engine, if_exists='append', index=False)
+        db_path = os.path.join(output_folder, f'{table_name}.sqlite')
+        engine = create_engine(f'sqlite:///{db_path}')
+        data.to_sql(table_name, con=engine, if_exists='replace', index=False)
     except Exception as e:
         logging.error(f"Error loading data to SQLite: {str(e)}")
             """
@@ -331,7 +373,6 @@ def load_data(data):
 
     async def generate_test_code(self, spec: dict, data_preview: pd.DataFrame = None) -> str:
         """Generate test code for the pipeline."""
-        pipeline_name = spec.get("pipeline_name", "pipeline")
         
         test_code = f'''
 import pytest
@@ -343,7 +384,7 @@ import os
 sys.path.append(os.path.dirname(__file__))
 
 try:
-    from {pipeline_name} import main
+    from pipeline import main
 except ImportError:
     # Fallback if import fails
     def main():
