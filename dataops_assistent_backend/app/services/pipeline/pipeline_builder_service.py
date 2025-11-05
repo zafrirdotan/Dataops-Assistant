@@ -65,17 +65,19 @@ class PipelineBuilderService:
         """
         try:
             start_time = datetime.datetime.now()
-            
             # Step 1: Generate pipeline specification
+            build_step = "generate_spec"
             self.log.info("Generating pipeline specification...")
             spec = await self.spec_gen.generate_spec(user_input)
             # Step 2: Validate schema
+            build_step = "validate_spec"
             self.log.info("Validating pipeline specification schema...")
             if not self.validate_spec_schema(spec):
                 self.log.error("Pipeline specification schema validation failed.")
                 return {"error": "Spec schema validation failed."}
             
             # step 3. Try connecting to source/destination
+            build_step = "validate_source_connection"
             self.log.info("Connecting to source/destination to validate access...")
             db_info = await self.source_service.fetch_data_from_source(spec, limit=5)
             if not db_info.get("success"):
@@ -83,10 +85,13 @@ class PipelineBuilderService:
                 return {"error": "Source/Destination connection failed.", "details": db_info.get("details")}
             
             # Step 4: Generate pipeline code 
+            build_step = "generate_code"
             self.log.info("Generating pipeline code...")
             pipeline_code = await self.code_gen.generate_code(spec, db_info)
             
             # Step 5: Create pipeline files in MinIO (instead of local files)
+            build_step = "store_pipeline_files"
+            self.log.info("Storing pipeline files in MinIO...")
             try:
                 pipeline_info = await self.output_service.store_pipeline_files(
                     spec.get("pipeline_name"), 
@@ -99,6 +104,7 @@ class PipelineBuilderService:
                 return {"error": f"Failed to store pipeline files: {e}"}
             
             # Step 6: Run tests from MinIO storage
+            build_step = "run_pipeline_tests"
             self.log.info("Running pipeline tests from MinIO storage...")
             try:
                 test_result = await self.test_service.run_pipeline_test_in_venv(
@@ -113,7 +119,10 @@ class PipelineBuilderService:
             if not test_result.get("success"):
                 self.log.error("Pipeline tests failed.")
                 return {
+                    "pipeline_name": spec.get("pipeline_name"),
+                    "pipeline_id": pipeline_id,
                     "success": False,
+                    "build_steps_completed": build_step,
                     "error": "Pipeline tests failed.",
                     "test_result": test_result
                 }
@@ -131,8 +140,9 @@ class PipelineBuilderService:
             # Step 7: Iterate to perfect the pipeline based on test results (if needed)
 
             # Step 8: Dockerize and deploy the pipeline
+            build_step = "dockerize_pipeline"
+            self.log.info("Dockerizing and deploying the pipeline...")
             try:
-                self.log.info("Dockerizing and deploying the pipeline...")
                 dockerize_result = await self.dockerize_service.build_pipeline_docker_image_and_test_it(pipeline_id, spec)
                 self.log.info(f"Dockerize result: {dockerize_result}")
             except Exception as e:
@@ -141,13 +151,17 @@ class PipelineBuilderService:
             if not dockerize_result.get("success"):
                 self.log.error("Dockerization failed.")
                 return {
-                    "success": False,
+                    "pipeline_name": spec.get("pipeline_name"),
+                    "build_steps_completed": build_step,
                     "pipeline_id": pipeline_id,
+                    "success": False,
                     "error": "Dockerization failed.",
                     "dockerize_result": dockerize_result
                 }
             
             # Step 9: Scheduling in airflow
+            build_step = "schedule_pipeline"
+            self.log.info("Scheduling the pipeline...")
             if spec.get("schedule") and spec.get("schedule") != "manual":
                 scheduled_result = await self.scheduler_service.save_pipeline_to_catalog(
                     pipeline_id,
@@ -170,8 +184,10 @@ class PipelineBuilderService:
             self.log.info(message)
             
             return {
-                "success": True,
+                "pipeline_name": spec.get("pipeline_name"),
                 "pipeline_id": pipeline_id, 
+                "build_steps_completed": build_step,
+                "success": True,
                 "spec": spec,
                 "test_result": test_result,
                 "message": message,
@@ -183,6 +199,9 @@ class PipelineBuilderService:
             self.log.error(f"Template-based pipeline creation failed: {e}")
             return {
                 "success": False,
+                "pipeline_name": spec.get("pipeline_name"),
+                "pipeline_id": pipeline_id,
+                "build_steps_completed": build_step,
                 "error": str(e),
                 "message": f"Failed to create pipeline: {e}"
             }
