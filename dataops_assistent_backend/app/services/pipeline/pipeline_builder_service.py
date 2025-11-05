@@ -51,7 +51,7 @@ class PipelineBuilderService:
                 if not spec.get("source_path", "").endswith('.csv'):
                     return False
             case "localFileJSON":
-                if not spec.get("source_path", "").endswith('.json'):
+                if not spec.get("source_path", "").endswith('.jsonl'):
                     return False
             case _:
                 pass
@@ -74,7 +74,7 @@ class PipelineBuilderService:
             self.log.info("Validating pipeline specification schema...")
             if not self.validate_spec_schema(spec):
                 self.log.error("Pipeline specification schema validation failed.")
-                return {"error": "Spec schema validation failed."}
+                return {"error": "Spec schema validation failed.", "spec": spec}
             
             # step 3. Try connecting to source/destination
             build_step = "validate_source_connection"

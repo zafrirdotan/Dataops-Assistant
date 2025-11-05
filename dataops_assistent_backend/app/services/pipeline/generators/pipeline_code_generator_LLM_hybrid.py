@@ -155,8 +155,6 @@ class PipelineCodeGeneratorLLMHybrid:
         prompt_details = {
             "parquet": (
                 "The destination is Parquet files. "
-                # "The output folder is located in minio."
-                # "in the tamplet example you will find how to connect to minio using environment variables."
                 "The output folder is specified in os.getenv('OUTPUT_FOLDER', './output'). "
             ),
             "sqlite": (
