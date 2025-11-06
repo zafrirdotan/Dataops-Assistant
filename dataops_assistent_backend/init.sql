@@ -7,21 +7,23 @@ CREATE SCHEMA IF NOT EXISTS dataops_assistent;
 CREATE SCHEMA IF NOT EXISTS dw;
 
 -- Create tables for storing pipeline metadata
-CREATE TABLE IF NOT EXISTS pipelines (
+CREATE TABLE IF NOT EXISTS dataops_assistent.pipelines (
     id SERIAL PRIMARY KEY,
-    name VARCHAR(255) NOT NULL UNIQUE,
-    description TEXT,
-    spec JSONB,
-    code TEXT,
-    status VARCHAR(50) DEFAULT 'created',
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    pipeline_id VARCHAR NOT NULL,
+    name VARCHAR NOT NULL,
+    created_by VARCHAR,
+    description VARCHAR,
+    created_at TIMESTAMPTZ,
+    updated_at TIMESTAMPTZ,
+    status VARCHAR,
+    run_list JSON,
+    spec JSON
 );
 
 -- Create tables for storing pipeline executions
-CREATE TABLE IF NOT EXISTS pipeline_executions (
+CREATE TABLE IF NOT EXISTS dataops_assistent.pipeline_executions (
     id SERIAL PRIMARY KEY,
-    pipeline_id INTEGER REFERENCES pipelines(id),
+    pipeline_id INTEGER REFERENCES dataops_assistent.pipelines(id),
     status VARCHAR(50) DEFAULT 'pending',
     started_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     completed_at TIMESTAMP WITH TIME ZONE,
