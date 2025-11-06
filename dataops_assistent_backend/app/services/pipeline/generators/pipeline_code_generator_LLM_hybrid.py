@@ -50,7 +50,8 @@ class PipelineCodeGeneratorLLMHybrid:
         Use only temporary directories (such as those provided by pytest’s tmp_path or Python’s tempfile module) for all test data and output.
         Do not delete or clean up static/shared directories.
         All test files and outputs should be created and removed automatically by the temporary directory context.
-        when testing the output as postgresql, use postgresql to test not sqlite.
+        When testing the output as postgresql, use postgresql to test not sqlite.
+        To convert a Python object to a JSON string use json.dumps() always.
 
         Output code, requirements.txt, and test code only in your response.
         """
