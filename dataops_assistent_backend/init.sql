@@ -4,6 +4,7 @@
 -- Create schemas if needed
 CREATE SCHEMA IF NOT EXISTS dataops;
 CREATE SCHEMA IF NOT EXISTS dataops_assistent;
+CREATE SCHEMA IF NOT EXISTS dw;
 
 -- Create tables for storing pipeline metadata
 CREATE TABLE IF NOT EXISTS pipelines (

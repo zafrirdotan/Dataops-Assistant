@@ -10,9 +10,6 @@ __pycache__/
 # Output files
 output/
 
-# Data
-data/
-
 # Docker volumes
 postgres_data/
 minio_data/
