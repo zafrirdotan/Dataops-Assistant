@@ -1,0 +1,21 @@
+customer_id,first_name,last_name,email,country,signup_date,is_active
+1,Robert,Butler,qlee@may.org,Kazakhstan,2025-01-31,True
+2,Mark,Villa,vasquezlori@henry-miranda.com,Reunion,2025-01-05,False
+3,Rachel,Mckinney,hblake@yahoo.com,Belize,2024-02-15,False
+4,Charles,Jones,nicole74@hotmail.com,Canada,2025-09-25,True
+5,Paul,James,anthonymartin@gmail.com,El Salvador,2024-04-24,True
+6,Ruth,Cortez,dbaird@mccormick.net,Christmas Island,2024-01-16,False
+7,Alisha,Garcia,erin33@gmail.com,Macedonia,2025-04-17,True
+8,Vincent,Haynes,blanchardjoanna@harper.com,Botswana,2025-09-25,False
+9,Phillip,Francis,johnsonwilliam@huerta-jones.com,Hong Kong,2024-12-28,False
+10,Donna,Hammond,robert35@yahoo.com,Sudan,2024-11-29,False
+11,Lisa,Greer,jesse14@hotmail.com,Tanzania,2025-08-11,False
+12,Andrea,Paul,ucarter@gmail.com,Morocco,2024-05-30,False
+13,Austin,Turner,hernandezmichael@hotmail.com,Bosnia and Herzegovina,2025-07-23,False
+14,Jacqueline,Bradley,pmartin@jones-cantu.com,Zambia,2024-01-05,True
+15,Juan,Bowers,morganpaul@burns.net,Qatar,2024-05-01,False
+16,Cynthia,Riddle,keith31@yahoo.com,Mexico,2023-12-03,True
+17,Diamond,Vasquez,stevenschristopher@hotmail.com,South Africa,2024-04-29,False
+18,Kevin,Perez,jerry01@oneal-rice.com,Northern Mariana Islands,2024-05-17,True
+19,Jesus,Sullivan,samuelgarcia@gibbs-montgomery.com,Tajikistan,2025-10-27,False
+20,Stephanie,Lewis,fconrad@hotmail.com,Mongolia,2025-04-12,True

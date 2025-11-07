@@ -1,6 +1,5 @@
 import json
 import os
-from typing import TypedDict
 from app.services.llm_service import LLMService
 import pandas as pd
 
@@ -39,19 +38,55 @@ class PipelineCodeGeneratorLLMHybrid:
 
         Use only the libraries specified in the requirements.txt.
         {self.generate_requirements_txt()}
+
+        Test Code:
+        This is an example of sanity test code for the pipeline:
+        {await self.generate_test_code(spec, pd.DataFrame())}
+        Follow this structure
+        Create some mock data to test the pipeline functions.
+        When cleaning up the output directory (e.g., output),
+        use shutil.rmtree with an onerror handler to handle files that are in use or locked.
+        Ensure all file handles are closed before attempting to delete the directory
+        Use only temporary directories (such as those provided by pytest’s tmp_path or Python’s tempfile module) for all test data and output.
+        Do not delete or clean up static/shared directories.
+        All test files and outputs should be created and removed automatically by the temporary directory context.
+        When testing the output as postgresql, use postgresql to test not sqlite.
+        To convert a Python object to a JSON string use json.dumps() always.
+
+        Output code, requirements.txt, and test code only in your response.
         """
 
         try:
-            # self.log.info(f"Generating code with prompt: {prompt}")
-            response = await self.llm.response_create_async(input = prompt)
+            response = await self.llm.response_create_async(
+                input = prompt,
+                text={
+                "format": {
+                    "type": "json_schema",
+                    "name": "extract_json",
+                    "strict": True,
+                    "schema": {
+                        "type": "object",
+                        "properties": {
+                            "pipeline": {"type": "string"},
+                            "requirements": {"type": "string"},
+                            "tests": {"type": "string"}
+                        },                       
+                        "required": ["pipeline", "requirements", "tests"],
+                        "additionalProperties": False
+                    }
+                }
+            })
+
         except Exception as e:
             self.log.error(f"Error generating code: {e}")
             return ""
-
+        print("Open ai Response:", response)  # For debugging purposes
+        json_response = json.loads(response.output_text)
+        
         return {
-            "code": self._clean_generated_code(response.output_text),
-            "requirements": self.generate_requirements_txt(),
-            "tests": self._clean_generated_code(await self.generate_test_code(spec, db_info.get("data_preview")))
+            "pipeline": self._clean_generated_code(json_response.get("pipeline", "")),
+            "requirements": self._clean_generated_code(json_response.get("requirements", "")),
+            "tests": self._clean_generated_code(json_response.get("tests", ""))
         }
     
     def getImplementationInstructions(self, spec: dict) -> str:
@@ -121,13 +156,11 @@ class PipelineCodeGeneratorLLMHybrid:
         prompt_details = {
             "parquet": (
                 "The destination is Parquet files. "
-                # "The output folder is located in minio."
-                # "in the tamplet example you will find how to connect to minio using environment variables."
-                "The output folder is specified in os.getenv('OUTPUT_FOLDER', './output'). "
+                "The output folder is specified in os.getenv('OUTPUT_FOLDER', './output_test'). "
             ),
             "sqlite": (
-                "The destination is a SQLite database. "
-                "The connection string is provided in os.getenv('DATABASE_URL'). "
+                "The destination is a SQLite files. "
+                 "The output folder is specified in os.getenv('OUTPUT_FOLDER', './output_test'). "
             ),
             "PostgreSQL": (
                 "The destination is a Postgres database. "
@@ -306,8 +339,10 @@ def load_data(data):
             return """
         def load_data(data):
             try:
-                output_folder = os.getenv('OUTPUT_FOLDER', './output')
-                os.makedirs(output_folder, exist_ok=True)
+                output_folder = os.getenv('OUTPUT_FOLDER', './output_test')
+                # Only create the directory if it does not exist
+                if not os.path.exists(output_folder):
+                    os.makedirs(output_folder)
                 output_path = os.path.join(output_folder, 'output.parquet')
                 data.to_parquet(output_path, index=False)
             except Exception as e:
@@ -317,10 +352,14 @@ def load_data(data):
             return """
 def load_data(data):
     try:
-        database_url = os.getenv('DATABASE_URL')
-        engine = create_engine(database_url)
+        output_folder = os.getenv('OUTPUT_FOLDER', './output_test')
+        # Only create the directory if it does not exist
+        if not os.path.exists(output_folder):
+            os.makedirs(output_folder)
         table_name = spec['destination_name']
-        data.to_sql(table_name, con=engine, if_exists='append', index=False)
+        db_path = os.path.join(output_folder, f'{table_name}.sqlite')
+        engine = create_engine(f'sqlite:///{db_path}')
+        data.to_sql(table_name, con=engine, if_exists='replace', index=False)
     except Exception as e:
         logging.error(f"Error loading data to SQLite: {str(e)}")
             """
@@ -333,7 +372,6 @@ def load_data(data):
 
     async def generate_test_code(self, spec: dict, data_preview: pd.DataFrame = None) -> str:
         """Generate test code for the pipeline."""
-        pipeline_name = spec.get("pipeline_name", "pipeline")
         
         test_code = f'''
 import pytest
@@ -345,7 +383,7 @@ import os
 sys.path.append(os.path.dirname(__file__))
 
 try:
-    from {pipeline_name} import main
+    from pipeline import main
 except ImportError:
     # Fallback if import fails
     def main():
@@ -413,26 +451,3 @@ if __name__ == "__main__":
             cleaned_lines.append(cleaned_line)
         
         return '\n'.join(cleaned_lines).replace("```", "")
-    
-    
-    #  from minio import Minio 
-    # # MinIO configuration from environment variables
-    #     minio_endpoint = os.getenv('MINIO_ENDPOINT')
-    #     minio_access_key = os.getenv('MINIO_ACCESS_KEY')
-    #     minio_secret_key = os.getenv('MINIO_SECRET_KEY')
-    #     minio_bucket = os.getenv('MINIO_BUCKET', 'default-bucket')
-
-    #     minio_client = Minio(
-    #         minio_endpoint,
-    #         access_key=minio_access_key,
-    #         secret_key=minio_secret_key,
-    #         secure=False  # Set to True if using HTTPS
-    #     )
-
-    #     # Upload the file
-    #     minio_client.fput_object(
-    #         minio_bucket,
-    #         'output.parquet',
-    #         output_path
-    #     )
-    #     # logging.info(f"Saved Parquet to MinIO bucket {minio_bucket}")

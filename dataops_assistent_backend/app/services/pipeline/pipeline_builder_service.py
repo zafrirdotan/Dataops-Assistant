@@ -1,11 +1,9 @@
 import logging
 import jsonschema
-import pandas as pd
 import datetime
 
-
-from .guards.prompt_guard_service import PromptGuardService
 from app.services.llm_service import LLMService
+from app.services.pipeline.registry.pipeline_registry_service import getPipelineRegistryService
 from .generators.pipeline_spec_generator import PipelineSpecGenerator
 from .generators.pipeline_code_generator_LLM_hybrid import PipelineCodeGeneratorLLMHybrid
 from .generators.pipeline_spec_generator import ETL_SPEC_SCHEMA
@@ -20,7 +18,6 @@ class PipelineBuilderService:
     def __init__(self):
         self.log = logging.getLogger(__name__)
         logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-        self.guard = PromptGuardService()
         self.llm = LLMService()
         self.spec_gen = PipelineSpecGenerator()
         self.local_file_service = LocalFileService()
@@ -31,6 +28,7 @@ class PipelineBuilderService:
         self.source_service = SourceService(self.log)
         self.dockerize_service = DockerizeService(self.log)
         self.scheduler_service = SchedulerService(self.log)
+        self.pipeline_registry = getPipelineRegistryService()
 
 
     def validate_spec_schema(self, spec: dict) -> bool:
@@ -53,7 +51,7 @@ class PipelineBuilderService:
                 if not spec.get("source_path", "").endswith('.csv'):
                     return False
             case "localFileJSON":
-                if not spec.get("source_path", "").endswith('.json'):
+                if not spec.get("source_path", "").endswith('.jsonl'):
                     return False
             case _:
                 pass
@@ -67,18 +65,19 @@ class PipelineBuilderService:
         """
         try:
             start_time = datetime.datetime.now()
-            
             # Step 1: Generate pipeline specification
+            build_step = "generate_spec"
             self.log.info("Generating pipeline specification...")
             spec = await self.spec_gen.generate_spec(user_input)
-            
             # Step 2: Validate schema
+            build_step = "validate_spec"
             self.log.info("Validating pipeline specification schema...")
             if not self.validate_spec_schema(spec):
                 self.log.error("Pipeline specification schema validation failed.")
-                return {"error": "Spec schema validation failed."}
+                return {"error": "Spec schema validation failed.", "spec": spec}
             
             # step 3. Try connecting to source/destination
+            build_step = "validate_source_connection"
             self.log.info("Connecting to source/destination to validate access...")
             db_info = await self.source_service.fetch_data_from_source(spec, limit=5)
             if not db_info.get("success"):
@@ -86,10 +85,13 @@ class PipelineBuilderService:
                 return {"error": "Source/Destination connection failed.", "details": db_info.get("details")}
             
             # Step 4: Generate pipeline code 
+            build_step = "generate_code"
             self.log.info("Generating pipeline code...")
             pipeline_code = await self.code_gen.generate_code(spec, db_info)
             
             # Step 5: Create pipeline files in MinIO (instead of local files)
+            build_step = "store_pipeline_files"
+            self.log.info("Storing pipeline files in MinIO...")
             try:
                 pipeline_info = await self.output_service.store_pipeline_files(
                     spec.get("pipeline_name"), 
@@ -102,6 +104,7 @@ class PipelineBuilderService:
                 return {"error": f"Failed to store pipeline files: {e}"}
             
             # Step 6: Run tests from MinIO storage
+            build_step = "run_pipeline_tests"
             self.log.info("Running pipeline tests from MinIO storage...")
             try:
                 test_result = await self.test_service.run_pipeline_test_in_venv(
@@ -118,44 +121,89 @@ class PipelineBuilderService:
                 self.log.error(f"Failed to run pipeline tests: {e}")
                 test_result = {"success": False, "details": f"Test execution failed: {e}"}
 
-            # Step 7: Iterate to perfect the pipeline based on test results (if needed)
+            if not test_result.get("success"):
+                self.log.error("Pipeline tests failed.")
+                return {
+                    "pipeline_name": spec.get("pipeline_name"),
+                    "pipeline_id": pipeline_id,
+                    "success": False,
+                    "build_steps_completed": build_step,
+                    "error": "Pipeline tests failed.",
+                    "test_result": test_result
+                }
+
+            # Register pipeline in the registry if tests passed
+            if test_result.get("success"):
+                logging.info("Registering pipeline in the registry...")
+                build_step = "register_pipeline"
+                try:
+                    await self.pipeline_registry.create_pipeline(
+                    pipeline_id=pipeline_id,
+                    name=spec.get("pipeline_name"),
+                    created_by=spec.get("created_by", "unknown"),
+                    description=spec.get("description", ""),
+                    spec=spec
+                    )
+                    self.log.info(f"Pipeline {pipeline_id} registered successfully.")
+                except Exception as e:
+                    self.log.error(f"Failed to register pipeline: {e}")
+                    return {"success": False, "details": f"Failed to register pipeline: {e}"}
+                
+            # TODO: Step 7: Iterate to perfect the pipeline based on test results (if needed)
 
             # Step 8: Dockerize and deploy the pipeline
+            build_step = "dockerize_pipeline"
             self.log.info("Dockerizing and deploying the pipeline...")
-            dockerize_result = await self.dockerize_service.dockerize_pipeline(pipeline_id)
+            try:
+                dockerize_result = await self.dockerize_service.build_and_test_docker_image(pipeline_id, spec)
+                self.log.info(f"Dockerize result: {dockerize_result}")
+            except Exception as e:
+                self.log.error(f"Failed to dockerize the pipeline: {e}")
+                return {"success": False, "details": f"Failed to dockerize the pipeline: {e}"}
             if not dockerize_result.get("success"):
-                self.log.error("Dockerization failed.", dockerize_result)
+                self.log.error("Dockerization failed.")
                 return {
+                    "pipeline_name": spec.get("pipeline_name"),
+                    "build_steps_completed": build_step,
+                    "pipeline_id": pipeline_id,
                     "success": False,
                     "error": "Dockerization failed.",
+                    "dockerize_result": dockerize_result
                 }
+            
+            # Step 9: Scheduling in airflow
+            build_step = "schedule_pipeline"
+            self.log.info("Scheduling the pipeline...")
+            if spec.get("schedule") and spec.get("schedule") != "manual":
+                scheduled_result = await self.scheduler_service.save_pipeline_to_catalog(
+                    pipeline_id,
+                    spec
+                )
+            else:
+                scheduled_result = {"success": True, "details": "Pipeline set to manual schedule; not added to catalog."}
 
-
-            # Step 9: Save pipeline to catalog.json for Airflow scheduling
-            scheduled_result = await self.scheduler_service.save_pipeline_to_catalog(
+            await self.pipeline_registry.update_pipeline(
                 pipeline_id,
-                spec
+                {
+                    "status": "deployed"
+                }
             )
 
-            if not scheduled_result.get("success"):
-                self.log.error("Scheduling failed.", scheduled_result)
-                return {
-                    "success": False,
-                    "error": "Scheduling failed.",
-                }
-            # TODO: Step 9: e2e testing
-
-
+            # Step 9: e2e testing
             execution_time = (datetime.datetime.now() - start_time).seconds
-            message = f"Template-based pipeline created successfully in {execution_time} seconds"
+            message = f"Pipeline created successfully in {execution_time} seconds"
             
-            response = {
+            self.log.info(message)
+            
+            return {
+                "pipeline_name": spec.get("pipeline_name"),
+                "pipeline_id": pipeline_id, 
+                "build_steps_completed": build_step,
                 "success": True,
-                "pipeline_id": pipeline_id,  # Add pipeline_id to response
                 "spec": spec,
-                "test_result": test_result,    # Test execution results
+                "test_result": test_result,
                 "message": message,
-                "dockerize_result": dockerize_result,
+                "dockerize_result": dockerize_result ,
                 "scheduling_result": scheduled_result
             }
             
@@ -167,6 +215,9 @@ class PipelineBuilderService:
             self.log.error(f"Template-based pipeline creation failed: {e}")
             return {
                 "success": False,
+                "pipeline_name": spec.get("pipeline_name"),
+                "pipeline_id": pipeline_id if 'pipeline_id' in locals() else None,
+                "build_steps_completed": build_step,
                 "error": str(e),
                 "message": f"Failed to create pipeline: {e}"
             }

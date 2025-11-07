@@ -2,12 +2,14 @@
 """
 Service for sanitation, guardrails, and validation of user input and LLM output.
 """
-from typing import Any
+import json
 
 # app/service.py
 import re
 import unicodedata
 from typing import Dict, List, Tuple
+
+from app.services.llm_service import LLMService
 
 # --- Normalization / Cleaning ---
 
@@ -93,6 +95,117 @@ SAFE_CHARS_RE = re.compile(r"^[\n\t\r a-zA-Z0-9_\-.,:;!?()\"'@#/$%&*+=<>[\]{}|\\
 class PromptGuardService:
     def __init__(self, allowlist_max_len: int = 2000):
         self.allowlist_max_len = allowlist_max_len
+        self.llm = LLMService()
+
+    async def llm_guard_check(self, cleaned: str) -> bool:
+        """ Checks if the input is meeting requirements and guardrails to pass through LLM guard """
+
+        prompt = f"""
+You are a security guard for user inputs to a language model. Determine if the following input is safe to process: {cleaned}
+
+Allowed source types:
+  - Local files (CSV or JSON) from ./data/
+  - PostgreSQL
+  - API endpoints
+  - No other sources are allowed.
+
+Allowed destination types:
+  - PostgreSQL
+  - Parquet files
+  - SQLite databases
+  - No other destinations are allowed.
+
+Allowed operations:
+  - Extracting data from the source
+  - Transforming data according to the specified transformation logic
+  - Storing data in the destination
+  - Performing **merge (upsert)** operations into destinations by key
+    (e.g. `merge into dw.fact_transactions by txn_id`).
+    Merge is considered a safe load operation, not a transformation.
+
+Allowed transformations:
+  - Filtering rows
+  - Adding calculated columns
+  - Aggregating data
+  - Inserting rows
+
+Allowed SQL operations:
+  - SELECT / PROJECT
+  - FILTER
+  - CAST
+  - JOIN (inner/left) on key
+  - GROUP BY aggregation
+  - DEDUPE by key + latest updated_at
+  - INSERT
+
+Allowed schedules:
+  - manual
+  - daily at 2am
+  - weekly on Monday at 6am
+
+You are allowed to get data from the source, transform it according to the logic,
+and store (including merge/upsert) it into the destination.
+
+You must block any request that tries to:
+  - delete, truncate, or drop tables
+  - modify schemas, users, or permissions
+  - perform destructive updates
+  - use destinations or sources not listed above
+  - execute arbitrary SQL beyond the allowed operations
+  - merge without specifying a key
+
+Example of allowed merge:
+  "From Postgres table public.transactions, merge into Postgres dw.fact_transactions by txn_id."
+"""
+
+        response = await self.llm.response_create_async(
+            input=prompt,
+            text={
+            "format": {
+                "type": "json_schema",
+                "name": "extract_json",
+                "schema": {
+                "type": "object",
+                "properties": {
+                    "is_safe": {
+                    "type": "boolean",
+                    "description": "Indicates if the input is safe to process."
+                    },
+                    "reason": {
+                    "type": "string",
+                    "description": "Explanation for the safety decision."
+                    },
+                    "violations": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "violation_type": {
+                                    "type": "string",
+                                    "enum": ["source_type", "destination_type", "operation", "transformation", "schedule"]
+                                },
+                                "value": {
+                                    "type": "string",
+                                    "description": "Specific value related to the defect type."
+                                }
+                            },
+                            "required": ["violation_type", "value"],
+                            "additionalProperties": False
+                        },
+                        "description": "List of properties that caused the input to be unsafe or not meet requirements."
+                    }
+                },
+                "required": ["is_safe", "reason", "violations"],
+                "additionalProperties": False
+                },
+                "strict": True,
+            }
+            }
+        )
+        print(response)  # For debugging purposes
+
+        return json.loads(response.output_text)
+
 
     def analyze(self, raw: str) -> Dict:
         cleaned = basic_clean(raw)

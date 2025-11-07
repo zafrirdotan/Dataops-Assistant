@@ -1,7 +1,6 @@
 name: airflow
 volumes:
   airflow-db:
-  app-db:
 
 networks:
   dataops-assistant-net:
@@ -10,25 +9,40 @@ networks:
 x-airflow-common: &airflow-common
   image: apache/airflow:3.1.0
   environment:
+    # --- Built-in admin user bootstrap (used by airflow-init only) ---
+    _AIRFLOW_WWW_USER_USERNAME: admin
+    _AIRFLOW_WWW_USER_PASSWORD: admin
+
     # --- Airflow core ---
     AIRFLOW__CORE__EXECUTOR: LocalExecutor
     AIRFLOW__CORE__LOAD_EXAMPLES: "false"
-    AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "true"
-    AIRFLOW__SCHEDULER__REFRESH_INTERVAL: 10
+    AIRFLOW__CORE__EXECUTION_API_SERVER_URL: http://airflow-api-server:8080/execution
+    AIRFLOW__CORE__SECRET_KEY: "one-shared-secret-key-keep-this-long-and-random"
+
+    # --- Simple auth manager (for development/testing only) ---
+    AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_ALL_ADMINS: "True"
+
+    # --- Airflow API ---
+    AIRFLOW__API__SECRET_KEY: "one-shared-secret-key-keep-this-long-and-random"
+    AIRFLOW__API_AUTH__JWT_SECRET: "one-shared-secret-key-keep-this-long-and-random"
+
     # --- Airflow metadata DB (separate from your app DB) ---
     AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-postgres:5432/airflow
-    # --- Your app DB connection (available to tasks) ---
-    DATABASE_URL: postgresql://dataops_user:dataops_password@postgres:5432/dataops_db
-    AIRFLOW_CONN_APP_DB: postgresql+psycopg2://dataops_user:dataops_password@postgres:5432/dataops_db
-    AIRFLOW_CONN_DATAOPS_ASSISTANT: http://dataops-assistant:80
+
+    # --- Enable Airflow SDK / API in 3.1 ---
     AIRFLOW__SDK__ENABLED: "true"
+    AIRFLOW__SDK__JWT_ALGORITHM: "HS256"
+
+    # --- App DB connection (available to tasks) ---
+    AIRFLOW_CONN_DATAOPS_ASSISTANT: http://dataops-assistant:80
 
   user: "${AIRFLOW_UID:-50000}:${AIRFLOW_GID:-0}"
+
   volumes:
     - ./airflow/dags:/opt/airflow/dags
     - ./airflow/logs:/opt/airflow/logs
     - ./airflow/plugins:/opt/airflow/plugins
-    # If you plan to run DockerOperator, keep these:
+    - ./airflow/config:/opt/airflow/config
     - /var/run/docker.sock:/var/run/docker.sock
     - /tmp:/tmp
   depends_on:
@@ -54,7 +68,6 @@ services:
       retries: 30
     volumes:
       - airflow-db:/var/lib/postgresql/data
-      - ./airflow/dags/pipelines/catalog.json:/opt/airflow/dags/pipelines/catalog.json
     networks:
       - dataops-assistant-net
 
@@ -67,19 +80,13 @@ services:
       - |
         set -e
         airflow db migrate
-        airflow users create \
-          --username admin \
-          --firstname Air \
-          --lastname Flow \
-          --role Admin \
-          --email admin@example.com \
-          --password admin
         echo "Airflow init done."
     restart: "no"
 
   # ---------------- Airflow services ----------------
-  airflow-webserver:
+  airflow-api-server:
     <<: *airflow-common
+    container_name: airflow-api-server
     command: api-server
     ports:
       - "8082:8080"
@@ -87,10 +94,12 @@ services:
 
   airflow-scheduler:
     <<: *airflow-common
+    container_name: airflow-scheduler
     command: scheduler
     restart: unless-stopped
 
   dag-processor:
     <<: *airflow-common
+    container_name: airflow-dag-processor
     command: dag-processor
     restart: unless-stopped

@@ -1,60 +1,52 @@
 {
   "pipelines": [
     {
-      "id": "ingest_csv_to_parquet_and_sqlite_20251023_1236_20251023_123623_d097432d-7",
-      "schedule": "48 12 * * *",
-      "description": "",
-      "tags": [],
-      "mode": "full",
-      "start_date": "2025-10-23T12:38:36.654906"
-    },
-    {
-      "id": "ingest_csv_to_parquet_and_sqlite_20251023_1236_20251023_1236d-7",
-      "schedule": "48 12 * * *",
-      "description": "",
-      "tags": [],
-      "mode": "full",
-      "start_date": "2025-10-23T12:38:36.654906"
-    },
-    {
-      "id": "ingest_csv_to_parquet_and_sqlite_20251023_1806_20251023_180632_bff86804",
+      "id": "ingest_orders_daily_20251029_1056_20251029_105638_c6c82899",
       "schedule": "0 2 * * *",
       "description": "",
       "tags": [],
       "mode": "full",
-      "start_date": "2025-10-23T18:08:11.921596"
+      "start_date": "2025-10-29T10:58:49.688731"
     },
     {
-      "id": "ingest_csv_to_parquet_and_sqlite_20251023_1811_20251023_181206_d82f3631",
-      "schedule": "20 21 * * *",
+      "id": "ingest_csv_to_parquet_and_sqlite_20251029_1103_20251029_110335_eb2a6387",
+      "schedule": "0 2 * * *",
       "description": "",
       "tags": [],
       "mode": "full",
-      "start_date": "2025-10-23T18:13:46.867697"
+      "start_date": "2025-10-29T11:04:32.251273"
     },
     {
-      "id": "ingest_csv_to_parquet_and_sqlite_20251023_1816_20251023_181631_bcbdcbfb",
-      "schedule": "20 18 * * *",
-      "description": "",
+      "id": "ingest_csv_to_parquet_and_sqlite_20251107_1230_20251107_123122_0ca43195",
+      "schedule": "0 2 * * *",
+      "description": "Ingest CSV files from the data directory into a Parquet file partitioned by date and a SQLite table named orders_daily, running daily at 02:00.",
       "tags": [],
       "mode": "full",
-      "start_date": "2025-10-23T18:18:07.218121"
+      "start_date": "2025-11-07T12:33:42.965989"
     },
     {
-      "id": "merge_transactions_by_txn_id_20251026_1033_20251026_103347_7369e55e",
-      "schedule": "0 0 * * *",
-      "description": "",
+      "id": "merge_transactions_by_txn_id_20251107_1234_20251107_123445_b4663ad3",
+      "schedule": "0 2 * * *",
+      "description": "Merge data from the public.transactions table in Postgres into the dw.fact_transactions table by txn_id.",
       "tags": [],
       "mode": "full",
-      "start_date": "2025-10-26T10:35:26.489395"
+      "start_date": "2025-11-07T12:36:29.943825"
     },
     {
-      "id": "ingest_csv_to_parquet_and_sqlite_20251026_1111_20251026_111216_df268320",
-      "schedule": "20 18 * * *",
-      "description": "",
+      "id": "load_customers_csv_to_postgres_20251107_1236_20251107_123732_82d07b90",
+      "schedule": "0 2 * * *",
+      "description": "Load customer data from a CSV file, filter out rows where email is null, and append to the PostgreSQL table dw.customers_clean.",
       "tags": [],
       "mode": "full",
-      "start_date": "2025-10-26T11:14:02.873468"
+      "start_date": "2025-11-07T12:39:08.472702"
+    },
+    {
+      "id": "ingest_transactions_csv_to_postgres_20251107_1239_20251107_123949_1e678fbf",
+      "schedule": "0 2 * * *",
+      "description": "Ingests transaction CSV files, casts amount and transaction_date, and merges into PostgreSQL fact table by txn_id.",
+      "tags": [],
+      "mode": "full",
+      "start_date": "2025-11-07T12:41:26.187021"
     }
   ]
 }

@@ -1,10 +1,10 @@
 
 
-import logging
 import docker 
 import os
 import aiofiles
 import shutil
+import asyncio
 
 from ..deployment.pipeline_output_service import PipelineOutputService
 class DockerizeService:
@@ -13,9 +13,10 @@ class DockerizeService:
         self.log = log
         self.output_service = PipelineOutputService()
         self.docker_client = docker.from_env()
-        self.network_name = "dataops-assistant_default"
+        self.network_name = "dataops-assistant-net"
+        self.env_test_template_path = os.path.join(os.path.dirname(__file__), "../testing/.env.test_template")
 
-    async def dockerize_pipeline(self, pipeline_id: str) -> dict:
+    async def dockerize_pipeline(self, pipeline_id: str, is_test: bool = False) -> dict:
         # Step 1: Retrieve pipeline files from MinIO
         try:
             stored_files = await self.output_service.get_pipeline_files(pipeline_id)
@@ -37,30 +38,28 @@ class DockerizeService:
                 env_file = os.path.join(build_dir, ".env")
                 dockerfile = os.path.join(build_dir, "Dockerfile")
 
-                # debug stored_files content data
-                # self.log.info(f"Stored files content keys: {list(stored_files.keys())}")
-                # self.log.info(f"Stored files content: {stored_files}")
-                self.log.info(f"Stored .env content: {stored_files.get('.env')}")
-
-
                 async with aiofiles.open(pipeline_file, 'w') as f:
-                    await f.write(stored_files.get('code', ''))
+                    await f.write(stored_files.get('pipeline', ''))
 
                 async with aiofiles.open(requirements_file, 'w') as f:
                     await f.write(stored_files.get('requirements', ''))
 
-                async with aiofiles.open(env_file, 'w') as f:
-                    await f.write(stored_files.get('.env', ''))
-
                 async with aiofiles.open(dockerfile, 'w') as f:
                     await f.write(stored_files.get('dockerfile', ''))
+                if not is_test:
+                    async with aiofiles.open(env_file, 'w') as f:
+                        await f.write(stored_files.get('.env', ''))
+                elif is_test:
+                    with open(self.env_test_template_path, "r") as f:
+                        env_test_content = f.read()
+                    async with aiofiles.open(env_file, 'w') as f:
+                        await f.write(env_test_content)
 
                 self.log.info(f"Pipeline files saved to build context: {build_dir}")
             except Exception as e:
                 self.log.error(f"Failed to save pipeline files to build context: {e}")
                 return {"success": False, "details": f"Failed to save pipeline files: {e}"}
             
-
             # Step 3: Build Docker image
             try:
                 image_tag = f"pipeline-{pipeline_id}:latest"
@@ -82,37 +81,36 @@ class DockerizeService:
         
             # Step 4: Run the container and connect it to the network
             try:
-
                 host_data_path = os.getenv("HOST_DATA_PATH", "/Users/yourusername/project/data")
                 host_output_path = os.getenv("HOST_OUTPUT_PATH", "/Users/yourusername/project/output")
 
-                container = self.docker_client.containers.run(
+                container = await asyncio.to_thread(
+                    self.docker_client.containers.run,
                     image_tag,
                     detach=True,
                     network=self.network_name,
                     name=container_name,
                     volumes={
-                            os.path.abspath(host_data_path): {"bind": "/app/data", "mode": "ro"},
-                            os.path.abspath(host_output_path): {"bind": "/app/output", "mode": "rw"},
-                        },
-                    # remove=True,
-                    labels={"app": "dataops-assistant", "pipeline_id": pipeline_id}, 
-                    # auto_remove=True
-
+                        os.path.abspath(host_data_path): {"bind": "/app/data", "mode": "ro"},
+                        os.path.abspath(host_output_path): {"bind": "/app/output", "mode": "rw"},
+                    },
+                    labels={"app": "dataops-assistant", "pipeline_id": pipeline_id},
                 )
 
-                self.docker_client.containers.prune(filters={"label": "app=dataops-assistant"})
+                await asyncio.to_thread(self.docker_client.containers.prune, filters={"label": "app=dataops-assistant"})
 
                 self.log.info(f"Docker container started for pipeline ID: {pipeline_id}, Container ID: {container.id}")
 
                 # Remove the container and image after running
-                container.wait()  # Wait for the container to finish
-                
-                logs = container.logs().decode('utf-8')
+                await asyncio.to_thread(container.wait)
+                logs = await asyncio.to_thread(container.logs)
+                logs = logs.decode('utf-8')
                 self.log.info(f"Container logs:\n{logs}")
 
-                container.remove(force=True)
-                self.docker_client.images.remove(image=image_tag, force=True)
+                await asyncio.to_thread(container.remove, force=True)
+                await asyncio.to_thread(self.docker_client.images.remove, image=image_tag, force=True)
+                self.log.info(f"Cleaned up container and image for pipeline ID: {pipeline_id}")
+
             except Exception as e:
                 self.log.error(f"Failed to start Docker container: {e}")
                 return {"success": False, "details": f"Failed to start Docker container: {e}"}
@@ -126,3 +124,7 @@ class DockerizeService:
             except Exception as cleanup_error:
                 self.log.error(f"Failed to clean up build directory: {cleanup_error}")
 
+    async def build_and_test_docker_image(self, pipeline_id: str, spec: dict) -> dict:
+        """Wrapper method to build and dockerize the pipeline."""
+        result = await self.dockerize_pipeline(pipeline_id, is_test=True)
+        return result
