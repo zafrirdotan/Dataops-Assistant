@@ -127,6 +127,7 @@ Allowed transformations:
   - Filtering rows
   - Adding calculated columns
   - Aggregating data
+  - Inserting rows
 
 Allowed SQL operations:
   - SELECT / PROJECT
@@ -135,6 +136,7 @@ Allowed SQL operations:
   - JOIN (inner/left) on key
   - GROUP BY aggregation
   - DEDUPE by key + latest updated_at
+  - INSERT
 
 Allowed schedules:
   - manual
