@@ -156,11 +156,11 @@ class PipelineCodeGeneratorLLMHybrid:
         prompt_details = {
             "parquet": (
                 "The destination is Parquet files. "
-                "The output folder is specified in os.getenv('OUTPUT_FOLDER', './output'). "
+                "The output folder is specified in os.getenv('OUTPUT_FOLDER', './output_test'). "
             ),
             "sqlite": (
                 "The destination is a SQLite files. "
-                 "The output folder is specified in os.getenv('OUTPUT_FOLDER', './output'). "
+                 "The output folder is specified in os.getenv('OUTPUT_FOLDER', './output_test'). "
             ),
             "PostgreSQL": (
                 "The destination is a Postgres database. "
@@ -339,7 +339,7 @@ def load_data(data):
             return """
         def load_data(data):
             try:
-                output_folder = os.getenv('OUTPUT_FOLDER', './output')
+                output_folder = os.getenv('OUTPUT_FOLDER', './output_test')
                 # Only create the directory if it does not exist
                 if not os.path.exists(output_folder):
                     os.makedirs(output_folder)
@@ -352,7 +352,7 @@ def load_data(data):
             return """
 def load_data(data):
     try:
-        output_folder = os.getenv('OUTPUT_FOLDER', './output')
+        output_folder = os.getenv('OUTPUT_FOLDER', './output_test')
         # Only create the directory if it does not exist
         if not os.path.exists(output_folder):
             os.makedirs(output_folder)

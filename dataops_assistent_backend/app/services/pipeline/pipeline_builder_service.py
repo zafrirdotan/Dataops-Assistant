@@ -109,7 +109,6 @@ class PipelineBuilderService:
             try:
                 test_result = await self.test_service.run_pipeline_test_in_venv(
                     pipeline_id,  # Pass pipeline_id instead of folder path
-                    spec
                 )
                 self.log.info(f"Test result: {test_result}")
             except Exception as e:
@@ -126,7 +125,7 @@ class PipelineBuilderService:
                     "error": "Pipeline tests failed.",
                     "test_result": test_result
                 }
-            
+
             # Register pipeline in the registry if tests passed
             if test_result.get("success"):
                 logging.info("Registering pipeline in the registry...")
@@ -144,14 +143,13 @@ class PipelineBuilderService:
                     self.log.error(f"Failed to register pipeline: {e}")
                     return {"success": False, "details": f"Failed to register pipeline: {e}"}
                 
-            # Step 7: Iterate to perfect the pipeline based on test results (if needed)
-             # temporarily disabled for faster iteration
+            # TODO: Step 7: Iterate to perfect the pipeline based on test results (if needed)
 
             # Step 8: Dockerize and deploy the pipeline
             build_step = "dockerize_pipeline"
             self.log.info("Dockerizing and deploying the pipeline...")
             try:
-                dockerize_result = await self.dockerize_service.build_pipeline_docker_image_and_test_it(pipeline_id, spec)
+                dockerize_result = await self.dockerize_service.build_and_test_docker_image(pipeline_id, spec)
                 self.log.info(f"Dockerize result: {dockerize_result}")
             except Exception as e:
                 self.log.error(f"Failed to dockerize the pipeline: {e}")

@@ -14,8 +14,9 @@ class DockerizeService:
         self.output_service = PipelineOutputService()
         self.docker_client = docker.from_env()
         self.network_name = "dataops-assistant-net"
+        self.env_test_template_path = os.path.join(os.path.dirname(__file__), "../testing/.env.test_template")
 
-    async def dockerize_pipeline(self, pipeline_id: str) -> dict:
+    async def dockerize_pipeline(self, pipeline_id: str, is_test: bool = False) -> dict:
         # Step 1: Retrieve pipeline files from MinIO
         try:
             stored_files = await self.output_service.get_pipeline_files(pipeline_id)
@@ -43,11 +44,16 @@ class DockerizeService:
                 async with aiofiles.open(requirements_file, 'w') as f:
                     await f.write(stored_files.get('requirements', ''))
 
-                async with aiofiles.open(env_file, 'w') as f:
-                    await f.write(stored_files.get('.env', ''))
-
                 async with aiofiles.open(dockerfile, 'w') as f:
                     await f.write(stored_files.get('dockerfile', ''))
+                if not is_test:
+                    async with aiofiles.open(env_file, 'w') as f:
+                        await f.write(stored_files.get('.env', ''))
+                elif is_test:
+                    with open(self.env_test_template_path, "r") as f:
+                        env_test_content = f.read()
+                    async with aiofiles.open(env_file, 'w') as f:
+                        await f.write(env_test_content)
 
                 self.log.info(f"Pipeline files saved to build context: {build_dir}")
             except Exception as e:
@@ -118,10 +124,7 @@ class DockerizeService:
             except Exception as cleanup_error:
                 self.log.error(f"Failed to clean up build directory: {cleanup_error}")
 
-    async def build_pipeline_docker_image_and_test_it(self, pipeline_id: str, spec: dict) -> dict:
+    async def build_and_test_docker_image(self, pipeline_id: str, spec: dict) -> dict:
         """Wrapper method to build and dockerize the pipeline."""
-        result = await self.dockerize_pipeline(pipeline_id)
-        # Clean up output files related to the pipeline
-        await self.output_service.clean_output_files(spec)
-        self.log.info(f"Cleaned up output files after testing docker image for pipeline ID: {pipeline_id}")
+        result = await self.dockerize_pipeline(pipeline_id, is_test=True)
         return result

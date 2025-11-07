@@ -14,8 +14,9 @@ class PipelineTestService:
     def __init__(self, log):
         self.log = log
         self.output_service = PipelineOutputService()
+        self.env_test_template_path = os.path.join(os.path.dirname(__file__), ".env.test_template")
 
-    async def run_pipeline_test_in_venv(self, pipeline_id: str, spec: dict) -> dict:
+    async def run_pipeline_test_in_venv(self, pipeline_id: str) -> dict:
         """
         Run the pipeline test in a virtual environment.
         """
@@ -55,9 +56,11 @@ class PipelineTestService:
                 async with aiofiles.open(requirements_file, 'w') as f:
                     await f.write(stored_files.get('requirements', ''))
 
+                with open(self.env_test_template_path, "r") as f:
+                    env_test_content = f.read()
                 async with aiofiles.open(env_file, 'w') as f:
-                    await f.write(stored_files.get('.env', ''))
-                
+                    await f.write(env_test_content)
+
                 self.log.info(f"Pipeline files written to temporary directory: {execution_dir}")
             except Exception as e:
                 self.log.error(f"Failed to write pipeline files: {e}")
@@ -129,10 +132,6 @@ class PipelineTestService:
                 stderr_lower = stderr.decode().lower() if stderr else ''
                 error_keywords = ['error', 'exception', 'traceback', 'fail']
                 found_error = any(kw in stdout_lower or kw in stderr_lower for kw in error_keywords)
-                
-                if spec.get("destination_type") in ["sqlite", "parquet"]:
-                    await self.output_service.clean_output_files(spec)
-                    self.log.info("Cleaned up output files for SQLite/Parquet destination.")
                 
                 if proc.returncode == 0 and not found_error:
                     self.log.info("Pipeline executed successfully")

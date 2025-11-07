@@ -16,7 +16,6 @@ services:
       - S3_SECRET_KEY=minioadmin
       - S3_BUCKET=dataops-bucket
       - DATA_FOLDER=/app/data
-      - OUTPUT_FOLDER=/app/output
       # Database Configuration
       - DATABASE_URL=postgresql://dataops_user:dataops_password@postgres:5432/dataops_db
       - POSTGRES_DB=dataops_db
