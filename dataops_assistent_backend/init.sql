@@ -32,27 +32,6 @@ CREATE TABLE IF NOT EXISTS dataops_assistent.pipeline_executions (
     output_data JSONB
 );
 
--- Create indexes for better performance
-CREATE INDEX IF NOT EXISTS idx_pipelines_name ON pipelines(name);
-CREATE INDEX IF NOT EXISTS idx_pipelines_status ON pipelines(status);
-CREATE INDEX IF NOT EXISTS idx_pipeline_executions_pipeline_id ON pipeline_executions(pipeline_id);
-CREATE INDEX IF NOT EXISTS idx_pipeline_executions_status ON pipeline_executions(status);
-
--- Create a function to update the updated_at timestamp
-CREATE OR REPLACE FUNCTION update_updated_at_column()
-RETURNS TRIGGER AS $$
-BEGIN
-    NEW.updated_at = CURRENT_TIMESTAMP;
-    RETURN NEW;
-END;
-$$ language 'plpgsql';
-
--- Create trigger to automatically update updated_at
-CREATE TRIGGER update_pipelines_updated_at 
-    BEFORE UPDATE ON pipelines 
-    FOR EACH ROW 
-    EXECUTE FUNCTION update_updated_at_column();
-
 -- Create transactions table for sample data
 CREATE TABLE IF NOT EXISTS public.transactions (
     transaction_id VARCHAR(20) PRIMARY KEY,

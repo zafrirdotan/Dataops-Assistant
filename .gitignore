@@ -7,8 +7,9 @@ __pycache__/
 # macOS system files
 .DS_Store
 
-# Output files
-output/
+# Output files — keep folder, ignore contents; track .gitkeep if present
+output/*
+!output/.gitkeep
 
 # Docker volumes
 postgres_data/
