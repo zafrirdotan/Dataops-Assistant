@@ -21,3 +21,6 @@ data-loaders/logs/
 
 # Airflow logs
 airflow/logs/
+
+# Python virtual environment
+venv/
