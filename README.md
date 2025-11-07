@@ -53,7 +53,13 @@ DataOps Assistant bridges the gap between data engineering and MLOps by providin
    docker compose -f docker-compose.airflow.yml up -d --build
    ```
 
-4. **Build and run main compose**
+4. **Update .env**
+
+   - Open the `.env` file in the root folder of the project as shown in `.env.example`.
+   - Update the OpenAI API key.
+   - Update the absolute paths for input and output volumes.
+
+5. **Build and run main compose**
    ```bash
    docker compose -f docker-compose.yml up -d --build
    ```
