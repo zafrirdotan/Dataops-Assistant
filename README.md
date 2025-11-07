@@ -4,14 +4,14 @@
 
 ### Project Summary
 
-DataOps Assistant is an intelligent co-pilot platform for automating, orchestrating, and managing data engineering workflows, including SQL analytics and ETL (Extract, Transform, Load) pipelines. It leverages LLM-powered code generation and validation to streamline the creation, testing, and deployment of data pipelines, making modern data operations accessible and efficient for both data engineers and analysts.
+DataOps Assistant is an intelligent co-pilot platform for automating, orchestrating, and managing ETL (Extract, Transform, Load) pipelines. It leverages LLM-powered code generation and validation to streamline the creation, testing, and scheduling of ETL pipelines, making modern data operations accessible and efficient for both data engineers and analysts.
 
 ### Main Capabilities
 
 - **Automated Pipeline Generation:** Generate ETL pipeline code and SQL queries from natural language specifications using LLMs.
 - **Schema and Data Validation:** Validate pipeline specs and data schemas before execution to ensure data quality and compliance.
 - **End-to-End Orchestration:** Build, test, and deploy pipelines with integrated Docker, Airflow, and MinIO support.
-- **Database Integration:** Seamless support for PostgreSQL (primary), SQLite (for isolated tests), and Parquet file outputs.
+- **Database & Data Integration:** Supports local CSV files and PostgreSQL as input sources; outputs to PostgreSQL, SQLite, or Parquet files.
 - **Test Automation:** Auto-generate and execute tests for pipelines, including integration with pytest and custom test runners.
 - **Cloud-Native Storage:** Store pipeline artifacts and outputs in MinIO (S3-compatible object storage).
 - **Scheduling & Monitoring:** Schedule pipelines via Airflow and monitor execution status and logs.
@@ -37,16 +37,14 @@ DataOps Assistant bridges the gap between data engineering and MLOps by providin
 1. **Clone the project**
 
    ```bash
-   git clone <repo-url>
+   git clone https://github.com/zafrirdotan/Dataops-Assistant.git
    cd Dataops-Assistant
    ```
 
 2. **Run setup script**
 
-   ```bash
-   ./setup.sh
-   # or
-   bash setup.sh
+   ```
+    bash setup.sh
    ```
 
 3. **Build and run Airflow compose**
@@ -65,16 +63,33 @@ DataOps Assistant bridges the gap between data engineering and MLOps by providin
 - Verify schemas exist (`dw`, `public`, `dataops_assistant`)
 - Verify tables in public schema (`bank_transactions`, `transaction`, `customers`)
 
+### API
+
+The DataOps Assistant provides a REST API for interacting with pipelines and the assistant service:
+
+- **Chat with Assistant:**  
+   `POST http://localhost:8080/chat`
+- **Trigger a Pipeline:**  
+   `POST http://localhost:8080/trigger-pipeline?pipeline_id={pipeline_id}`
+- **List All Pipelines:**  
+   `GET http://localhost:8080/pipelines`
+- **API Documentation:**  
+   [DataOps Assistant API Docs](http://localhost:8080/docs)
+
+Refer to the API docs for details on all available endpoints and request/response formats.
+
 ### Data Files
 
 **Input:**
 
 - Data Folder: Place CSV files in the project's root `data/` directory (`./data/<your-file>.csv`)
-- DB: PostgreSQL (local, running in Docker)
+- DB: PostgreSQL (local, running in Docker) in port 5432.
 
 _At this point, it is the same DB for input, output, and the system DB._
 
 **Output:**
 
-- The output Parquet and SQLite files will be located in the output folder after a manual or scheduled run.
-- _Note: The output folder is currently used for both production and testing; this will be resolved in the future._
+- Parquet and SQLite files will be located in the output folder after a manual or scheduled run.
+- PostgreSQL data will be in DB in port 5432
+- Full python code for the pipelines will be in minio http://localhost:9001/ username:minioadmin password:minioadmin
+- Airflow schedules can be found on http://localhost:8082/dags and in airflow/dags/pipelines/catalog.json
