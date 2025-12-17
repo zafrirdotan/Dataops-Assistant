@@ -13,7 +13,7 @@ class ChatService:
         self.pipeline_builder_service = PipelineBuilderService()
         self.storage_service = MinioStorage()
 
-    async def process_message(self, raw_message: str) -> dict:
+    async def process_message(self, raw_message: str, fast: bool = False) -> dict:
         """
         Process the user message, validate it, and get a response from the LLM.
         """
@@ -46,7 +46,7 @@ class ChatService:
             }
 
         # Step 2: Generate pipeline
-        build_result = await self.pipeline_builder_service.build_pipeline(cleaned_input)
+        build_result = await self.pipeline_builder_service.build_pipeline(cleaned_input, fast=fast)
 
         return {
             "decision": "allow",

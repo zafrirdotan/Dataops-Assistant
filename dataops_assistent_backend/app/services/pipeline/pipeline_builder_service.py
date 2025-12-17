@@ -58,7 +58,7 @@ class PipelineBuilderService:
         return True
 
 
-    async def build_pipeline(self, user_input: str, output_dir: str = "pipelines") -> dict:
+    async def build_pipeline(self, user_input: str, output_dir: str = "pipelines", fast: bool = False) -> dict:
         """
         Build a pipeline using the new template-based approach.
         This is a more efficient alternative to the full build_pipeline method.
@@ -104,36 +104,39 @@ class PipelineBuilderService:
                 return {"error": f"Failed to store pipeline files: {e}"}
             
             # Step 6: Run tests from MinIO storage
-            build_step = "run_pipeline_tests"
-            self.log.info("Running pipeline tests from MinIO storage...")
-            try:
-                test_result = await self.test_service.run_pipeline_test_in_venv(
-                    pipeline_id,  # Pass pipeline_id instead of folder path
-                )
-                self.log.info(f"Test result: {test_result}")
-                if not test_result.get("success"):
-                    self.log.error("Pipeline tests failed.", test_result)
-                    return {
-                        "success": False,
-                        "error": "Pipeline tests failed.",
-                    }
-            except Exception as e:
-                self.log.error(f"Failed to run pipeline tests: {e}")
-                test_result = {"success": False, "details": f"Test execution failed: {e}"}
+            if not fast:
+                build_step = "run_pipeline_tests"
+                self.log.info("Running pipeline tests from MinIO storage...")
+                try:
+                    test_result = await self.test_service.run_pipeline_test_in_venv(
+                        pipeline_id,  # Pass pipeline_id instead of folder path
+                    )
+                    self.log.info(f"Test result: {test_result}")
+                    if not test_result.get("success"):
+                        self.log.error("Pipeline tests failed.", test_result)
+                        return {
+                            "success": False,
+                            "error": "Pipeline tests failed.",
+                        }
+                except Exception as e:
+                    self.log.error(f"Failed to run pipeline tests: {e}")
+                    test_result = {"success": False, "details": f"Test execution failed: {e}"}
 
-            if not test_result.get("success"):
-                self.log.error("Pipeline tests failed.")
-                return {
-                    "pipeline_name": spec.get("pipeline_name"),
-                    "pipeline_id": pipeline_id,
-                    "success": False,
-                    "build_steps_completed": build_step,
-                    "error": "Pipeline tests failed.",
-                    "test_result": test_result
-                }
+                if not test_result.get("success"):
+                    self.log.error("Pipeline tests failed.")
+                    return {
+                        "pipeline_name": spec.get("pipeline_name"),
+                        "pipeline_id": pipeline_id,
+                        "success": False,
+                        "build_steps_completed": build_step,
+                        "error": "Pipeline tests failed.",
+                        "test_result": test_result
+                    }
+            else:
+                test_result = {"skipped": True, "details": "Skipped tests in fast mode."}
 
             # Register pipeline in the registry if tests passed
-            if test_result.get("success"):
+            if test_result.get("success") or test_result.get("skipped"):
                 logging.info("Registering pipeline in the registry...")
                 build_step = "register_pipeline"
                 try:
