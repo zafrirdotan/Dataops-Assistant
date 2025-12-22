@@ -93,9 +93,10 @@ SEVERITY = {
 SAFE_CHARS_RE = re.compile(r"^[\n\t\r a-zA-Z0-9_\-.,:;!?()\"'@#/$%&*+=<>[\]{}|\\~`]+$")
 
 class PromptGuardService:
-    def __init__(self, allowlist_max_len: int = 2000):
+    def __init__(self, allowlist_max_len: int = 2000, log=None):
         self.allowlist_max_len = allowlist_max_len
         self.llm = LLMService()
+        self.log = log
 
     async def llm_guard_check(self, cleaned: str) -> bool:
         """ Checks if the input is meeting requirements and guardrails to pass through LLM guard """
@@ -202,7 +203,8 @@ Example of allowed merge:
             }
             }
         )
-        print(response)  # For debugging purposes
+
+        self.log.debug("LLM Guard Check Response: %s", json.dumps(response.output_text))
 
         return json.loads(response.output_text)
 

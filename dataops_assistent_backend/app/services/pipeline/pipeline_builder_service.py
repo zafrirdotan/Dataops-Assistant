@@ -1,3 +1,4 @@
+import json
 import logging
 import jsonschema
 import datetime
@@ -19,7 +20,7 @@ class PipelineBuilderService:
         self.log = logging.getLogger(__name__)
         logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
         self.llm = LLMService()
-        self.spec_gen = PipelineSpecGenerator()
+        self.spec_gen = PipelineSpecGenerator(self.log)
         self.local_file_service = LocalFileService()
         self.database_service = get_database_service() 
         self.code_gen = PipelineCodeGeneratorLLMHybrid(self.log)
@@ -137,7 +138,7 @@ class PipelineBuilderService:
 
             # Register pipeline in the registry if tests passed
             if test_result.get("success") or test_result.get("skipped"):
-                logging.info("Registering pipeline in the registry...")
+                self.log.info("Registering pipeline in the registry...")
                 build_step = "register_pipeline"
                 try:
                     await self.pipeline_registry.create_pipeline(
@@ -159,7 +160,7 @@ class PipelineBuilderService:
             self.log.info("Dockerizing and deploying the pipeline...")
             try:
                 dockerize_result = await self.dockerize_service.build_and_test_docker_image(pipeline_id, spec)
-                self.log.info(f"Dockerize result: {dockerize_result}")
+                self.log.info(f"Dockerize result:\n{json.dumps(dockerize_result, indent=2)}")
             except Exception as e:
                 self.log.error(f"Failed to dockerize the pipeline: {e}")
                 return {"success": False, "details": f"Failed to dockerize the pipeline: {e}"}
@@ -197,8 +198,8 @@ class PipelineBuilderService:
             message = f"Pipeline created successfully in {execution_time} seconds"
             
             self.log.info(message)
-            
-            return {
+
+            response = {
                 "pipeline_name": spec.get("pipeline_name"),
                 "pipeline_id": pipeline_id, 
                 "build_steps_completed": build_step,
@@ -209,11 +210,11 @@ class PipelineBuilderService:
                 "dockerize_result": dockerize_result ,
                 "scheduling_result": scheduled_result
             }
+
+            self.log.info("Pipeline build response:\n%s", json.dumps(response, indent=2))
             
-            self.log.info(f"Pipeline creation successful: {response}")
-
             return response
-
+            
         except Exception as e:
             self.log.error(f"Template-based pipeline creation failed: {e}")
             return {

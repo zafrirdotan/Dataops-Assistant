@@ -53,7 +53,8 @@ class PipelineSpecGenerator:
     """
     Service for generating pipeline specifications (specs) for ML/data pipelines.
     """
-    def __init__(self):
+    def __init__(self, logger):
+        self.log = logger
         self.llm = LLMService()
 
     async def generate_spec(self, user_input: str) -> dict:
@@ -99,11 +100,11 @@ class PipelineSpecGenerator:
         except Exception as e:
             raise RuntimeError(f"LLM request failed: {e}")
 
-        print(response)  # For debugging purposes
+        
 
         spec = json.loads(response.output_text)
 
-        print(f"Generated spec: {spec}")  # For debugging purposes
+        self.log.info("Generated spec:\n%s", json.dumps(spec, indent=2))
 
         # Validate required fields based on source type
         self._validate_spec_requirements(spec)

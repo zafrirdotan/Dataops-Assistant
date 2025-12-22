@@ -73,7 +73,10 @@ class DockerizeService:
                     pull=False,
                     )
                 for log in logs:
-                        self.log.info(log)
+                    if 'stream' in log:
+                        self.log.debug(log['stream'].strip())
+                    else:
+                        self.log.debug(log)
                 self.log.info(f"Docker image built successfully for pipeline ID: {pipeline_id}")
             except Exception as e:
                 self.log.error(f"Failed to build Docker image: {e}")

@@ -1,3 +1,4 @@
+import json
 import logging
 
 from app.services.llm_service import LLMService
@@ -9,7 +10,7 @@ class ChatService:
     def __init__(self):
         self.logger = logging.getLogger(__name__)
         self.llm_service = LLMService()
-        self.prompt_guard_service = PromptGuardService()
+        self.prompt_guard_service = PromptGuardService(log=self.logger)
         self.pipeline_builder_service = PipelineBuilderService()
         self.storage_service = MinioStorage()
 
@@ -36,7 +37,7 @@ class ChatService:
             logging.error(f"Error during LLM Guard Check: {e}")
             return 
         
-        logging.info(f"LLM Guard Response: {guardResponse}")
+        logging.info("LLM Guard Response:\n%s", json.dumps(guardResponse, indent=2))
 
         if not guardResponse.get("is_safe", False):
             return {

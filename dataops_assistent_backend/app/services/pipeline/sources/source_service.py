@@ -53,8 +53,7 @@ class SourceService:
                         raw_preview = df.head().to_dict(orient="records")
                         # Make JSON serializable
                         data_preview = make_json_serializable(raw_preview)
-                        # self.log.info(f"PostgreSQL data preview: {data_preview}")
-                        # self.log.info(f"PostgreSQL columns info: {columns}")
+                        self.log.debug(f"PostgreSQL data preview: {data_preview}")
                     else:
                         self.log.warning(f"No data found in table {table_name}")
                 except Exception as e:

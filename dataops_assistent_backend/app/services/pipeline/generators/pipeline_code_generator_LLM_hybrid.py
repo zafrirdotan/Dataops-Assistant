@@ -1,4 +1,5 @@
 import json
+from logging import debug
 import os
 from app.services.llm_service import LLMService
 import pandas as pd
@@ -80,7 +81,7 @@ class PipelineCodeGeneratorLLMHybrid:
         except Exception as e:
             self.log.error(f"Error generating code: {e}")
             return ""
-        print("Open ai Response:", response)  # For debugging purposes
+        self.log.debug(f"LLM Code Generation Response: {response.output_text}")
         json_response = json.loads(response.output_text)
         
         return {
