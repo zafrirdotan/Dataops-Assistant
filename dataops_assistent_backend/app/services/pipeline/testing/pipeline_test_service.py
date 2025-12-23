@@ -47,7 +47,6 @@ class PipelineTestService:
             # Write files asynchronously
             try:
                 async with aiofiles.open(pipeline_file, 'w') as f:
-                    print("Writing pipeline code:", stored_files.get('pipeline', ''))  # For debugging purposes
                     await f.write(stored_files.get('pipeline', ''))
                 
                 async with aiofiles.open(test_file, 'w') as f:

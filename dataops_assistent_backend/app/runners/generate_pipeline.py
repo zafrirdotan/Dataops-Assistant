@@ -40,12 +40,8 @@ def pretty_print_pipeline_result(pipeline_result):
         ("Pipeline ID", build_spec.get('pipeline_id', 'N/A')),
         ("Build Steps Completed", build_spec.get('build_steps_completed', 'N/A')),
         ("Success", build_spec.get('success', 'N/A')),
-        ("request_spec", build_spec.get('request_spec', 'N/A')),
-        ("test_result", build_spec.get('test_result', 'N/A')),
-        ("message", build_spec.get('message', 'N/A')),
-        ("dockerize_result", build_spec.get('dockerize_result', 'N/A')),
-        ("scheduling_result", build_spec.get('scheduling_result', 'N/A')),
-        ("error", build_spec.get('error', 'N/A')),
+        ("Message", build_spec.get('message', 'N/A')),
+        ("Error", build_spec.get('error', 'N/A')),
     ]
 
     for label, value in rows:
