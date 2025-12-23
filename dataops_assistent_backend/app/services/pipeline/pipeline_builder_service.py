@@ -5,6 +5,7 @@ import datetime
 
 from app.services.llm_service import LLMService
 from app.services.pipeline.registry.pipeline_registry_service import getPipelineRegistryService
+from app.models.pipeline_types import PipelineBuildResponse
 from .generators.pipeline_spec_generator import PipelineSpecGenerator
 from .generators.pipeline_code_generator_LLM_hybrid import PipelineCodeGeneratorLLMHybrid
 from .generators.pipeline_spec_generator import ETL_SPEC_SCHEMA
@@ -15,10 +16,10 @@ from .deployment.pipeline_output_service import PipelineOutputService
 from .sources.source_service import SourceService
 from .deployment.dockerize_service import DockerizeService
 from .deployment.scheduler_service import SchedulerService
+import logging
 class PipelineBuilderService:
     def __init__(self):
-        self.log = logging.getLogger(__name__)
-        logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+        self.log = logging.getLogger("dataops")
         self.llm = LLMService()
         self.spec_gen = PipelineSpecGenerator(self.log)
         self.local_file_service = LocalFileService()
@@ -59,27 +60,43 @@ class PipelineBuilderService:
         return True
 
 
-    async def build_pipeline(self, user_input: str, output_dir: str = "pipelines", fast: bool = False) -> dict:
+    async def build_pipeline(self, user_input: str, fast: bool = False, mode: str = "chat", debug: bool = False) -> PipelineBuildResponse:
         """
         Build a pipeline using the new template-based approach.
         This is a more efficient alternative to the full build_pipeline method.
         """
         try:
+            # Set logging level for cmd users
+            if mode == "cmd":
+                if debug:
+                    logging.getLogger().setLevel(logging.INFO)
+                else:
+                    logging.getLogger().setLevel(logging.WARNING)
+
             start_time = datetime.datetime.now()
             # Step 1: Generate pipeline specification
             build_step = "generate_spec"
-            self.log.info("Generating pipeline specification...")
+            step_msg = "Generating pipeline specification..."
+            self.log.info(f"[STEP: {build_step}] {step_msg}")
+            if mode == "cmd":
+                print(f"Step 1: {step_msg}")
             spec = await self.spec_gen.generate_spec(user_input)
             # Step 2: Validate schema
             build_step = "validate_spec"
-            self.log.info("Validating pipeline specification schema...")
+            step_msg = "Validating pipeline specification schema..."
+            self.log.info(f"[STEP: {build_step}] {step_msg}")
+            if mode == "cmd":
+                print(f"Step 2: {step_msg}")
             if not self.validate_spec_schema(spec):
                 self.log.error("Pipeline specification schema validation failed.")
                 return {"error": "Spec schema validation failed.", "spec": spec}
             
-            # step 3. Try connecting to source/destination
+            # Step 3: Try connecting to source/destination
             build_step = "validate_source_connection"
-            self.log.info("Connecting to source/destination to validate access...")
+            step_msg = "Connecting to source/destination to validate access..."
+            self.log.info(f"[STEP: {build_step}] {step_msg}")
+            if mode == "cmd":
+                print(f"Step 3: {step_msg}")
             db_info = await self.source_service.fetch_data_from_source(spec, limit=5)
             if not db_info.get("success"):
                 self.log.error("Source/Destination connection failed.")
@@ -87,12 +104,18 @@ class PipelineBuilderService:
             
             # Step 4: Generate pipeline code 
             build_step = "generate_code"
-            self.log.info("Generating pipeline code...")
+            step_msg = "Generating pipeline code..."
+            self.log.info(f"[STEP: {build_step}] {step_msg}")
+            if mode == "cmd":
+                print(f"Step 4: {step_msg}")
             pipeline_code = await self.code_gen.generate_code(spec, db_info)
             
             # Step 5: Create pipeline files in MinIO (instead of local files)
             build_step = "store_pipeline_files"
-            self.log.info("Storing pipeline files in MinIO...")
+            step_msg = "Storing pipeline files in MinIO..."
+            self.log.info(f"[STEP: {build_step}] {step_msg}")
+            if mode == "cmd":
+                print(f"Step 5: {step_msg}")
             try:
                 pipeline_info = await self.output_service.store_pipeline_files(
                     spec.get("pipeline_name"), 
@@ -107,7 +130,10 @@ class PipelineBuilderService:
             # Step 6: Run tests from MinIO storage
             if not fast:
                 build_step = "run_pipeline_tests"
-                self.log.info("Running pipeline tests from MinIO storage...")
+                step_msg = "Running pipeline tests from MinIO storage..."
+                self.log.info(f"[STEP: {build_step}] {step_msg}")
+                if mode == "cmd":
+                    print(f"Step 6: {step_msg}")
                 try:
                     test_result = await self.test_service.run_pipeline_test_in_venv(
                         pipeline_id,  # Pass pipeline_id instead of folder path
@@ -138,8 +164,11 @@ class PipelineBuilderService:
 
             # Register pipeline in the registry if tests passed
             if test_result.get("success") or test_result.get("skipped"):
-                self.log.info("Registering pipeline in the registry...")
                 build_step = "register_pipeline"
+                step_msg = "Registering pipeline in the registry..."
+                self.log.info(f"[STEP: {build_step}] {step_msg}")
+                if mode == "cmd":
+                    print(f"Step 7: {step_msg}")
                 try:
                     await self.pipeline_registry.create_pipeline(
                     pipeline_id=pipeline_id,
@@ -157,7 +186,10 @@ class PipelineBuilderService:
 
             # Step 8: Dockerize and deploy the pipeline
             build_step = "dockerize_pipeline"
-            self.log.info("Dockerizing and deploying the pipeline...")
+            step_msg = "Dockerizing and deploying the pipeline..."
+            self.log.info(f"[STEP: {build_step}] {step_msg}")
+            if mode == "cmd":
+                print(f"Step 8: {step_msg}")
             try:
                 dockerize_result = await self.dockerize_service.build_and_test_docker_image(pipeline_id, spec)
                 self.log.info(f"Dockerize result:\n{json.dumps(dockerize_result, indent=2)}")
@@ -177,7 +209,10 @@ class PipelineBuilderService:
             
             # Step 9: Scheduling in airflow
             build_step = "schedule_pipeline"
-            self.log.info("Scheduling the pipeline...")
+            step_msg = "Scheduling the pipeline..."
+            self.log.info(f"[STEP: {build_step}] {step_msg}")
+            if mode == "cmd":
+                print(f"Step 9: {step_msg}")
             if spec.get("schedule") and spec.get("schedule") != "manual":
                 scheduled_result = await self.scheduler_service.save_pipeline_to_catalog(
                     pipeline_id,
@@ -198,13 +233,15 @@ class PipelineBuilderService:
             message = f"Pipeline created successfully in {execution_time} seconds"
             
             self.log.info(message)
+            if mode == "cmd":
+                print(f"Done! {message}")
 
             response = {
                 "pipeline_name": spec.get("pipeline_name"),
                 "pipeline_id": pipeline_id, 
                 "build_steps_completed": build_step,
                 "success": True,
-                "spec": spec,
+                "request_spec": spec,
                 "test_result": test_result,
                 "message": message,
                 "dockerize_result": dockerize_result ,

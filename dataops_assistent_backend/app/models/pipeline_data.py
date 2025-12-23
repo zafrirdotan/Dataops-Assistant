@@ -4,6 +4,7 @@ import datetime
 
 Base = declarative_base()
 
+
 class PipelineData(Base):
     __tablename__ = 'pipelines'
     __table_args__ = {'schema': 'dataops_assistent'}

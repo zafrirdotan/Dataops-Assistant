@@ -10,7 +10,6 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 import logging
 
-logger = logging.getLogger(__name__)
 
 # Database configuration
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://dataops_user:dataops_password@localhost:5432/dataops_db")
@@ -32,6 +31,7 @@ class DatabaseService:
         self.async_engine = async_engine
         self.SessionLocal = SessionLocal
         self.AsyncSessionLocal = AsyncSessionLocal
+        self.logger = logging.getLogger("dataops")
     
     def get_db_session(self):
         """Get a database session."""
@@ -44,8 +44,8 @@ class DatabaseService:
     def test_connection(self) -> bool:
         """Test database connection."""
         try:
-            logger.info("Testing database connection...")
-            logger.info(f"Using DATABASE_URL: {DATABASE_URL}")
+            self.logger.info("Testing database connection...")
+            self.logger.info(f"Using DATABASE_URL: {DATABASE_URL}")
             
             # Test the connection with explicit transaction handling
             connection = self.engine.connect()
@@ -53,14 +53,14 @@ class DatabaseService:
                 result = connection.execute(text("SELECT 1 as test_value"))
                 row = result.fetchone()
                 success = row is not None and row[0] == 1
-                logger.info(f"Connection test result: {success}")
+                self.logger.info(f"Connection test result: {success}")
                 return success
             finally:
                 connection.close()
                 
         except Exception as e:
-            logger.error(f"Database connection test failed: {e}")
-            logger.error(f"Exception type: {type(e).__name__}")
+            self.logger.error(f"Database connection test failed: {e}")
+            self.logger.error(f"Exception type: {type(e).__name__}")
             return False
     
     def execute_query(self, query: str, params: dict = None):
@@ -71,7 +71,7 @@ class DatabaseService:
                 connection.commit()
                 return result
         except SQLAlchemyError as e:
-            logger.error(f"Query execution failed: {e}")
+            self.logger.error(f"Query execution failed: {e}")
             raise
     
     def fetch_all(self, query: str, params: dict = None):
@@ -81,7 +81,7 @@ class DatabaseService:
                 result = connection.execute(text(query), params or {})
                 return result.fetchall()
         except SQLAlchemyError as e:
-            logger.error(f"Query execution failed: {e}")
+            self.logger.error(f"Query execution failed: {e}")
             raise
     
     def fetch_one(self, query: str, params: dict = None):
@@ -91,7 +91,7 @@ class DatabaseService:
                 result = connection.execute(text(query), params or {})
                 return result.fetchone()
         except SQLAlchemyError as e:
-            logger.error(f"Query execution failed: {e}")
+            self.logger.error(f"Query execution failed: {e}")
             raise
 
     def get_connection_info(self) -> dict:
@@ -134,28 +134,28 @@ class DatabaseService:
     async def test_connection(self) -> bool:
         """Test async database connection."""
         try:
-            logger.info("Testing async database connection...")
-            logger.info(f"Using ASYNC_DATABASE_URL: {ASYNC_DATABASE_URL}")
+            self.logger.info("Testing async database connection...")
+            self.logger.info(f"Using ASYNC_DATABASE_URL: {ASYNC_DATABASE_URL}")
             
             # Test the connection with explicit transaction handling
             async with self.async_engine.connect() as connection:
                 result = await connection.execute(text("SELECT 1 as test_value"))
                 row = result.fetchone()
                 success = row is not None and row[0] == 1
-                logger.info(f"Async connection test result: {success}")
+                self.logger.info(f"Async connection test result: {success}")
                 return success
                 
         except Exception as e:
-            logger.error(f"Async database connection test failed: {e}")
-            logger.error(f"Exception type: {type(e).__name__}")
+            self.logger.error(f"Async database connection test failed: {e}")
+            self.logger.error(f"Exception type: {type(e).__name__}")
             # Fallback to sync version
             return self.test_connection_sync()
     
     def test_connection_sync(self) -> bool:
         """Test sync database connection (fallback)."""
         try:
-            logger.info("Testing sync database connection...")
-            logger.info(f"Using DATABASE_URL: {DATABASE_URL}")
+            self.logger.info("Testing sync database connection...")
+            self.logger.info(f"Using DATABASE_URL: {DATABASE_URL}")
             
             # Test the connection with explicit transaction handling
             connection = self.engine.connect()
@@ -163,14 +163,14 @@ class DatabaseService:
                 result = connection.execute(text("SELECT 1 as test_value"))
                 row = result.fetchone()
                 success = row is not None and row[0] == 1
-                logger.info(f"Sync connection test result: {success}")
+                self.logger.info(f"Sync connection test result: {success}")
                 return success
             finally:
                 connection.close()
                 
         except Exception as e:
-            logger.error(f"Sync database connection test failed: {e}")
-            logger.error(f"Exception type: {type(e).__name__}")
+            self.logger.error(f"Sync database connection test failed: {e}")
+            self.logger.error(f"Exception type: {type(e).__name__}")
             return False
     
     async def execute_query_async(self, query: str, params: dict = None):
@@ -181,7 +181,7 @@ class DatabaseService:
                 await connection.commit()
                 return result
         except SQLAlchemyError as e:
-            logger.error(f"Async query execution failed: {e}")
+            self.logger.error(f"Async query execution failed: {e}")
             raise
     
     async def fetch_all(self, query: str, params: dict = None):
@@ -191,7 +191,7 @@ class DatabaseService:
                 result = await connection.execute(text(query), params or {})
                 return result.fetchall()
         except SQLAlchemyError as e:
-            logger.error(f"Async query execution failed: {e}")
+            self.logger.error(f"Async query execution failed: {e}")
             # Fallback to sync version
             return self.fetch_all_sync(query, params)
     
@@ -202,7 +202,7 @@ class DatabaseService:
                 result = connection.execute(text(query), params or {})
                 return result.fetchall()
         except SQLAlchemyError as e:
-            logger.error(f"Sync query execution failed: {e}")
+            self.logger.error(f"Sync query execution failed: {e}")
             raise
     
     async def fetch_one_async(self, query: str, params: dict = None):
@@ -212,7 +212,7 @@ class DatabaseService:
                 result = await connection.execute(text(query), params or {})
                 return result.fetchone()
         except SQLAlchemyError as e:
-            logger.error(f"Async query execution failed: {e}")
+            self.logger.error(f"Async query execution failed: {e}")
             raise
 
 # Global database service instance

@@ -200,9 +200,10 @@ from dotenv import load_dotenv
 import glob
 
 # Configure logging
+PIPELINE_NAME = spec.get("pipeline_name", "unknown_pipeline")
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s %(levelname)s %(name)s %(message)s",
+    format=f"%(asctime)s %(levelname)s %(name)s [pipeline: {spec.get('pipeline_name', 'unknown_pipeline')}] %(message)s",
     handlers=[
         logging.FileHandler("pipeline.log"),
         logging.StreamHandler()

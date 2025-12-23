@@ -17,7 +17,7 @@ class PipelineOutputService:
     """
     
     def __init__(self):
-        self.log = logging.getLogger(__name__)
+        self.log = logging.getLogger("dataops")
         self.storage_service = MinioStorage()
         # Keep template dir for backward compatibility
         self.template_dir = os.path.dirname(__file__)

@@ -5,7 +5,7 @@ import datetime
 from dotenv import load_dotenv
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.future import select
-from app.models.pipeline import Pipeline, Base
+from app.models.pipeline_data import PipelineData, Base
 
 load_dotenv()
 DB_URL = os.getenv("ASYNC_DATABASE_URL", "postgresql+asyncpg://dataops_user:dataops_password@postgres:5432/dataops_db")
@@ -23,7 +23,7 @@ class PipelineRegistryService:
     async def create_pipeline(self, pipeline_id, name, created_by, description=None, spec=None):
         async with self.Session() as session:
             now = datetime.datetime.now(datetime.timezone.utc)
-            pipeline = Pipeline(
+            pipeline = PipelineData(
                 pipeline_id=pipeline_id,
                 name=name,
                 created_by=created_by,
@@ -41,7 +41,7 @@ class PipelineRegistryService:
 
     async def update_pipeline(self, pipeline_id, updates):
         async with self.Session() as session:
-            result = await session.execute(select(Pipeline).filter_by(pipeline_id=pipeline_id))
+            result = await session.execute(select(PipelineData).filter_by(pipeline_id=pipeline_id))
             pipeline = result.scalar_one_or_none()
             if not pipeline:
                 return None
@@ -54,19 +54,19 @@ class PipelineRegistryService:
 
     async def get_pipeline(self, pipeline_id):
         async with self.Session() as session:
-            result = await session.execute(select(Pipeline).filter_by(pipeline_id=pipeline_id))
+            result = await session.execute(select(PipelineData).filter_by(pipeline_id=pipeline_id))
             pipeline = result.scalar_one_or_none()
             return pipeline
 
     async def list_pipelines(self):
         async with self.Session() as session:
-            result = await session.execute(select(Pipeline))
+            result = await session.execute(select(PipelineData))
             pipelines = result.scalars().all()
             return pipelines
 
     async def add_run(self, pipeline_id, run_info):
         async with self.Session() as session:
-            result = await session.execute(select(Pipeline).filter_by(pipeline_id=pipeline_id))
+            result = await session.execute(select(PipelineData).filter_by(pipeline_id=pipeline_id))
             pipeline = result.scalar_one_or_none()
             if not pipeline:
                 return None
@@ -78,7 +78,7 @@ class PipelineRegistryService:
 
     async def update_status(self, pipeline_id, status):
         async with self.Session() as session:
-            result = await session.execute(select(Pipeline).filter_by(pipeline_id=pipeline_id))
+            result = await session.execute(select(PipelineData).filter_by(pipeline_id=pipeline_id))
             pipeline = result.scalar_one_or_none()
             if not pipeline:
                 return None

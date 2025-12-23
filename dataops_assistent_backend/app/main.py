@@ -7,10 +7,10 @@ from app.services.database_service import get_database_service
 import logging
 
 from app.services.pipeline.registry.pipeline_registry_service import getPipelineRegistryService
+from app.logging_config import setup_logging
 
 # Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+logger = setup_logging(level=logging.INFO)
 
 try:
     storage_service = MinioStorage()

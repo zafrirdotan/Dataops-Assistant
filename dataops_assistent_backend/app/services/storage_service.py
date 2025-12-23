@@ -12,7 +12,7 @@ from botocore.client import Config as BotoConfig
 from botocore.exceptions import ClientError
 
 
-logger = logging.getLogger(__name__)
+
 
 SAFE_NAME = re.compile(r"[^A-Za-z0-9._+-]")
 
@@ -38,6 +38,7 @@ class MinioStorage:
         self.use_path_style = os.getenv("S3_USE_PATH_STYLE", "true").lower() == "true"
         self.public_base_url = os.getenv("PUBLIC_S3_BASE_URL", "http://localhost:9000")
         self.expires = int(os.getenv("PRESIGN_EXPIRES_SECONDS", "600"))
+        self.logger = logging.getLogger("dataops")
 
         self.client = boto3.client(
             "s3",
@@ -105,7 +106,7 @@ class MinioStorage:
     # Pipeline Management Methods
     async def initialize_pipeline_buckets(self):
         """Initialize required buckets for pipeline storage"""
-        logger.info("Initializing MinIO pipeline buckets...")
+        self.logger.info("Initializing MinIO pipeline buckets...")
         
         await asyncio.to_thread(self._create_buckets_sync, list(self.pipeline_buckets.values()))
         
@@ -114,13 +115,13 @@ class MinioStorage:
         for bucket in buckets:
             try:
                 self.client.head_bucket(Bucket=bucket)
-                logger.debug(f"Bucket '{bucket}' already exists")
+                self.logger.debug(f"Bucket '{bucket}' already exists")
             except ClientError:
                 try:
                     self.client.create_bucket(Bucket=bucket)
-                    logger.info(f"Created MinIO bucket: {bucket}")
+                    self.logger.info(f"Created MinIO bucket: {bucket}")
                 except ClientError as e:
-                    logger.error(f"Error creating bucket {bucket}: {e}")
+                    self.logger.error(f"Error creating bucket {bucket}: {e}")
 
     async def store_pipeline(self, pipeline_id: str, pipeline_data: Dict[str, Any]) -> Dict[str, str]:
         """Store complete pipeline with versioning"""
@@ -128,7 +129,7 @@ class MinioStorage:
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         
         try:
-            logger.info(f"Storing pipeline {pipeline_id} with version {timestamp}")
+            self.logger.info(f"Storing pipeline {pipeline_id} with version {timestamp}")
             
             pipeline_path = f"{pipeline_id}/v{timestamp}"
             # Store pipeline code
@@ -194,11 +195,11 @@ class MinioStorage:
             await self._store_json_file("pipelines", metadata_path, metadata)
             stored_files['metadata'] = f"s3://pipelines/{metadata_path}"
             
-            logger.info(f"Stored {len(stored_files)} files for pipeline {pipeline_id}")
+            self.logger.info(f"Stored {len(stored_files)} files for pipeline {pipeline_id}")
             return stored_files
             
         except Exception as e:
-            logger.error(f"Error storing pipeline: {e}")
+            self.logger.error(f"Error storing pipeline: {e}")
             raise
 
     async def retrieve_pipeline(self, pipeline_id: str, version: Optional[str] = None) -> Dict[str, Any]:
@@ -230,7 +231,7 @@ class MinioStorage:
             return pipeline_data
             
         except Exception as e:
-            logger.error(f"Error retrieving pipeline: {e}")
+            self.logger.error(f"Error retrieving pipeline: {e}")
             raise
 
     async def list_pipeline_versions(self, pipeline_id: str) -> List[Dict[str, Any]]:
@@ -265,7 +266,7 @@ class MinioStorage:
             return versions
             
         except Exception as e:
-            logger.error(f"Error listing pipeline versions: {e}")
+            self.logger.error(f"Error listing pipeline versions: {e}")
             return []
 
     async def delete_pipeline(self, pipeline_id: str, version: Optional[str] = None):
@@ -274,20 +275,20 @@ class MinioStorage:
             if version:
                 # Delete specific version
                 prefix = f"{pipeline_id}/v{version}/"
-                logger.info(f"Deleting pipeline {pipeline_id} version {version}")
+                self.logger.info(f"Deleting pipeline {pipeline_id} version {version}")
             else:
                 # Delete all versions
                 prefix = f"{pipeline_id}/"
-                logger.info(f"Deleting all versions of pipeline {pipeline_id}")
+                self.logger.info(f"Deleting all versions of pipeline {pipeline_id}")
             
             # Delete from all pipeline buckets
             for bucket in self.pipeline_buckets.values():
                 await self._delete_objects_with_prefix(bucket, prefix)
             
-            logger.info(f"Deleted pipeline {pipeline_id}" + (f" version {version}" if version else " (all versions)"))
+            self.logger.info(f"Deleted pipeline {pipeline_id}" + (f" version {version}" if version else " (all versions)"))
             
         except Exception as e:
-            logger.error(f"Error deleting pipeline: {e}")
+            self.logger.error(f"Error deleting pipeline: {e}")
             raise
 
     async def _store_text_file(self, bucket: str, path: str, content: str):
@@ -346,7 +347,7 @@ class MinioStorage:
                         Bucket=bucket,
                         Delete={'Objects': objects_to_delete}
                     )
-                    logger.debug(f"Deleted {len(objects_to_delete)} objects from {bucket}/{prefix}")
+                    self.logger.debug(f"Deleted {len(objects_to_delete)} objects from {bucket}/{prefix}")
                     
         except ClientError as e:
             # Ignore if bucket doesn't exist or is empty
@@ -369,7 +370,7 @@ class MinioStorage:
             )
             return url
         except ClientError as e:
-            logger.error(f"Error generating presigned URL: {e}")
+            self.logger.error(f"Error generating presigned URL: {e}")
             raise
 
     async def get_storage_status(self) -> Dict[str, Any]:
@@ -410,7 +411,7 @@ class MinioStorage:
             }
             
         except Exception as e:
-            logger.error(f"Error getting storage status: {e}")
+            self.logger.error(f"Error getting storage status: {e}")
             return {
                 "status": "error",
                 "error": str(e)

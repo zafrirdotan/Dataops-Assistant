@@ -4,12 +4,11 @@ from app.services.pipeline.pipeline_builder_service import PipelineBuilderServic
 from app.services.pipeline.deployment.dockerize_service import DockerizeService
 from app.services.pipeline.registry.pipeline_registry_service import getPipelineRegistryService
 
-logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("dataops")
 
 router = APIRouter()
 pipeline_builder = PipelineBuilderService()
-dockerize_service = DockerizeService(logging.getLogger(__name__))
+dockerize_service = DockerizeService(logger)
 pipeline_registry = getPipelineRegistryService()
 
 @router.post("/trigger-pipeline")
