@@ -10,6 +10,7 @@ class PipelineBuildResponse(TypedDict, total=False):
     message: str | None
     dockerize_result: dict[str, Any]
     scheduling_result: dict[str, Any]
+    execution_time: int | None
     error: str | None
 
 
