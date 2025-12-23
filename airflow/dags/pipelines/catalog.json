@@ -63,6 +63,70 @@
       "tags": [],
       "mode": "full",
       "start_date": "2025-12-22T08:44:48.267952"
+    },
+    {
+      "id": "ingest_csv_to_parquet_and_sqlite_20251223_1336_20251223_133645_93a636e7",
+      "schedule": "0 2 * * *",
+      "description": "Ingest CSV files from the data directory into a Parquet file partitioned by date and a SQLite table named orders_daily, running daily at 02:00.",
+      "tags": [],
+      "mode": "full",
+      "start_date": "2025-12-23T13:38:44.354569"
+    },
+    {
+      "id": "ingest_csv_to_parquet_and_sqlite_20251223_1350_20251223_135113_c91fc2cb",
+      "schedule": "0 2 * * *",
+      "description": "Ingest CSV files from the data directory into a Parquet file partitioned by date and a SQLite table named orders_daily, running daily at 02:00.",
+      "tags": [],
+      "mode": "full",
+      "start_date": "2025-12-23T13:53:01.026365"
+    },
+    {
+      "id": "ingest_csv_to_parquet_and_sqlite_20251223_1611_20251223_161235_83d35bd3",
+      "schedule": "0 2 * * *",
+      "description": "Ingest CSV files from the data directory into a Parquet file partitioned by date and a SQLite table named orders_daily, running daily at 02:00.",
+      "tags": [],
+      "mode": "full",
+      "start_date": "2025-12-23T16:14:29.397329"
+    },
+    {
+      "id": "orders_daily_ingest_20251223_1627_20251223_162744_29288287",
+      "schedule": "0 2 * * *",
+      "description": "Ingest CSV files from ./data/ to Parquet (partitioned by date) and SQLite table orders_daily, running daily at 02:00.",
+      "tags": [],
+      "mode": "full",
+      "start_date": "2025-12-23T16:29:38.140643"
+    },
+    {
+      "id": "ingest_csv_to_parquet_and_sqlite_20251223_1637_20251223_163819_738bebd1",
+      "schedule": "0 2 * * *",
+      "description": "Ingest CSV files from the data directory into a Parquet file partitioned by date and a SQLite table named orders_daily, running daily at 02:00.",
+      "tags": [],
+      "mode": "full",
+      "start_date": "2025-12-23T16:40:14.311907"
+    },
+    {
+      "id": "ingest_csv_to_parquet_and_sqlite_20251223_1646_20251223_164725_a1be4a2c",
+      "schedule": "0 2 * * *",
+      "description": "Ingest CSV files from the data directory into a Parquet file partitioned by date and a SQLite table named orders_daily, running daily at 02:00.",
+      "tags": [],
+      "mode": "full",
+      "start_date": "2025-12-23T16:49:13.299545"
+    },
+    {
+      "id": "orders_daily_ingest_20251223_1934_20251223_193530_aa145ccd",
+      "schedule": "0 2 * * *",
+      "description": "Ingest CSV files from ./data/ to both Parquet (partitioned by date) and SQLite table orders_daily, running daily at 02:00.",
+      "tags": [],
+      "mode": "full",
+      "start_date": "2025-12-23T19:37:22.694073"
+    },
+    {
+      "id": "ingest_csv_to_parquet_and_sqlite_20251223_1940_20251223_194051_45af09bb",
+      "schedule": "0 2 * * *",
+      "description": "Ingest CSV files from the ./data/ directory into Parquet files partitioned by date and into a SQLite table named orders_daily, running daily at 02:00.",
+      "tags": [],
+      "mode": "full",
+      "start_date": "2025-12-23T19:42:38.386307"
     }
   ]
 }

@@ -5,20 +5,22 @@ import time
 import asyncio
 
 class LocalFileService:
-    def __init__(self, data_directory=None):
+    def __init__(self,log, data_directory=None):
         """Initialize with environment-aware data directory"""
+        self.log = log
+
         if data_directory is None:
             # Use /app/data in Docker, ./data locally
             if os.path.exists("/app/data"):
                 self.data_directory = "/app/data"
-                print("Environment detected: Docker container - using /app/data")
+                self.log.info("Environment detected: Docker container - using /app/data")
             elif os.path.exists("../data"):
                 self.data_directory = "../data"
-                print("Environment detected: Local development - using ../data")
+                self.log.info("Environment detected: Local development - using ../data")
             else:
                 # Fallback to current directory
                 self.data_directory = "."
-                print("Environment detected: Fallback - using current directory")
+                self.log.info("Environment detected: Fallback - using current directory")
         else:
             self.data_directory = data_directory
             print(f"Using custom data directory: {self.data_directory}")
@@ -27,7 +29,7 @@ class LocalFileService:
         """Resolve file pattern to work with the configured data directory"""
         # Handle absolute paths - return as is
         if os.path.isabs(file_pattern):
-            print(f"Resolved pattern '{file_pattern}' to '{file_pattern}' (absolute path)")
+            self.log.info(f"Resolved pattern '{file_pattern}' to '{file_pattern}' (absolute path)")
             return file_pattern
         
         # Handle patterns that start with ./data/ or data/ - these should be treated as direct file references
@@ -44,7 +46,7 @@ class LocalFileService:
         
         # Join with data directory
         full_pattern = os.path.join(self.data_directory, clean_pattern)
-        print(f"Resolved pattern '{file_pattern}' to '{full_pattern}'")
+        self.log.info(f"Resolved pattern '{file_pattern}' to '{full_pattern}'")
         return full_pattern
 
     def retrieve_recent_data_files(self, file_pattern, date_column=None, date_value=None):

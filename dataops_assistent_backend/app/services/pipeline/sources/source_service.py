@@ -13,7 +13,7 @@ class SourceService:
     def __init__(self, log):
 
         self.log = log
-        self.local_file_service = LocalFileService()
+        self.local_file_service = LocalFileService(self.log)
         self.database_service = get_database_service()
 
     async def fetch_data_from_source(self, spec: dict, limit: int) -> dict:

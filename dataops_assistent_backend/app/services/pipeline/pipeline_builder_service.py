@@ -24,7 +24,7 @@ class PipelineBuilderService:
         self.log = logging.getLogger("dataops")
         self.llm = LLMService()
         self.spec_gen = PipelineSpecGenerator(self.log)
-        self.local_file_service = LocalFileService()
+        self.local_file_service = LocalFileService(self.log)
         self.database_service = get_database_service() 
         self.code_gen = PipelineCodeGeneratorLLMHybrid(self.log)
         self.output_service = PipelineOutputService()
@@ -35,7 +35,7 @@ class PipelineBuilderService:
         self.pipeline_registry = getPipelineRegistryService()
 
 
-    def validate_spec_schema(self, spec: dict) -> bool:
+    async def validate_spec_schema(self, spec: dict) -> bool:
         # Validate spec against ETL_SPEC_SCHEMA using jsonschema
         try:
             jsonschema.validate(instance=spec, schema=ETL_SPEC_SCHEMA)
@@ -91,9 +91,9 @@ class PipelineBuilderService:
             step_msg = "Validating pipeline specification schema..."
             step_number = 2
             self.log.info(f"[STEP: {build_step}] {step_msg}")
-            if mode == "cmd":
-                print(f"Step {step_number}: {step_msg}")
-            if not self.validate_spec_schema(spec):
+         
+            isValidSpec, error = await self._run_step(step_msg, step_number, self.validate_spec_schema, spec, mode=mode)
+            if not isValidSpec or error:
                 self.log.error("Pipeline specification schema validation failed.")
                 return {"error": "Spec schema validation failed.", "spec": spec}
             
@@ -149,8 +149,6 @@ class PipelineBuilderService:
                 step_msg = "Running pipeline tests from MinIO storage..."
                 step_number = 6
                 self.log.info(f"[STEP: {build_step}] {step_msg}")
-                if mode == "cmd":
-                    print(f"Step {step_number}: {step_msg}")
                 try:
                     test_result, error = await self._run_step(step_msg, step_number, self.test_service.run_pipeline_test_in_venv,
                         pipeline_id,  # Pass pipeline_id instead of folder path
@@ -179,7 +177,8 @@ class PipelineBuilderService:
                     }
             else:
                 if mode == "cmd":
-                    print("Fast mode enabled; skipping tests.")
+                    print("\033[93m[Step 6]: Run Pipeline Tests Fast mode enabled; skipping tests.\033[0m")
+
                 self.log.info("Fast mode enabled; skipping tests.")
 
                 test_result = {"skipped": True, "details": "Skipped tests in fast mode."}
@@ -215,8 +214,7 @@ class PipelineBuilderService:
             step_msg = "Dockerizing and deploying the pipeline..."
             step_number = 8
             self.log.info(f"[STEP: {build_step}] {step_msg}")
-            if mode == "cmd":
-                print(f"Step 8: {step_msg}")
+     
             try:
                 dockerize_result, error = await self._run_step(step_msg, step_number, self.dockerize_service.build_and_test_docker_image, pipeline_id, spec, mode=mode)
                 self.log.info(f"Dockerize result:\n{json.dumps(dockerize_result, indent=2)}")
@@ -242,8 +240,7 @@ class PipelineBuilderService:
             step_msg = "Scheduling the pipeline..."
             step_number = 9
             self.log.info(f"[STEP: {build_step}] {step_msg}")
-            if mode == "cmd":
-                print(f"Step 9: {step_msg}")
+
             if spec.get("schedule") and spec.get("schedule") != "manual":
                 scheduled_result, error = await self._run_step(step_msg, step_number, self.scheduler_service.save_pipeline_to_catalog,
                     pipeline_id,
@@ -267,7 +264,7 @@ class PipelineBuilderService:
             
             self.log.info(message)
             if mode == "cmd":
-                print(f"Done! {message}")
+                print(f"\n\033[94mDone! {message}\033[0m")
 
             response = {
                 "pipeline_name": spec.get("pipeline_name"),
@@ -303,16 +300,21 @@ class PipelineBuilderService:
         Returns (result, error). If error is not None, result is None.
         """
         if mode == "cmd":
-            text  = f"Step {step_number}: {step_msg}"
-
-            with yaspin(text=text, color="cyan") as spinner:
-                try:
-                    result = await coro(*args, **kwargs)
-                    spinner.ok("✔")
-                    return result, None
-                except Exception as e:
-                    spinner.fail("✗")
-                    return None, e
+            text = f"Step {step_number}: {step_msg}"
+            status_col = 65  # Column where status should start
+            # Pad text to status_col, so status always starts at the same place
+            padded_text = text.ljust(status_col)
+            spinner = yaspin(text=text, color="cyan")
+            spinner.start()
+            try:
+                result = await coro(*args, **kwargs)
+                spinner.text = ''
+                spinner.ok(f" \033[92m✔\033[0m {padded_text}\033[92mSuccess\033[0m")
+                return result, None
+            except Exception as e:
+                spinner.text = ''
+                spinner.fail(f" \033[91m✖\033[0m {padded_text}\033[91mFailed\033[0m")
+                return None, e
         else:
             try:
                 result = await coro(*args, **kwargs)

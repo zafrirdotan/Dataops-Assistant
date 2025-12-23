@@ -15,6 +15,13 @@ async def main():
         return
     message = args[0]
     chat_service = ChatService()
+
+    print("""
+──────────────────────────────────────────────────────────────
+    \033[94mStarting pipeline generation...\033[0m
+──────────────────────────────────────────────────────────────
+          """)
+    
     pipeline_result = await chat_service.process_message(message, fast=fast, mode="cmd")
     pretty_print_pipeline_result(pipeline_result)
     
@@ -24,10 +31,10 @@ def pretty_print_pipeline_result(pipeline_result):
         print(pipeline_result)
         return
     build_spec: PipelineBuildResponse = pipeline_result.get('build_spec', {})
-    print("""
+    print("\033[94m" + """
 ──────────────────────────────────────────────────────────────
-Pipeline Creation Summary
-──────────────────────────────────────────────────────────────""")
+    Pipeline Creation Summary
+──────────────────────────────────────────────────────────────""" + "\033[0m")
     rows = [
         ("Pipeline Name", build_spec.get('pipeline_name', 'N/A')),
         ("Pipeline ID", build_spec.get('pipeline_id', 'N/A')),
