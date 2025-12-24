@@ -1,2 +1,2 @@
 #!/bin/zsh
-docker compose exec dataops-assistant python -m app.runners.generate_pipeline "$@"
+docker compose exec dataops-assistant python -m runners.generate_pipeline "$@"

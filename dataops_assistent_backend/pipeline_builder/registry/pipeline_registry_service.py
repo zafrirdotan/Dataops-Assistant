@@ -5,7 +5,7 @@ import datetime
 from dotenv import load_dotenv
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.future import select
-from app.models.pipeline_data import PipelineData, Base
+from shared.models.pipeline_data import PipelineData, Base
 
 load_dotenv()
 DB_URL = os.getenv("ASYNC_DATABASE_URL", "postgresql+asyncpg://dataops_user:dataops_password@postgres:5432/dataops_db")

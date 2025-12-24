@@ -3,7 +3,7 @@
 from os import sync
 import pandas as pd
 
-from app.utils.json_utils import make_json_serializable
+from shared.utils.json_utils import make_json_serializable
 
 from shared.services.database_service import get_database_service
 from .local_file_service import LocalFileService

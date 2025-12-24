@@ -7,7 +7,7 @@ from shared.services.database_service import get_database_service
 import logging
 
 from pipeline_builder.registry.pipeline_registry_service import getPipelineRegistryService
-from app.logging_config import setup_logging
+from shared.logging_config import setup_logging
 
 # Configure logging
 logger = setup_logging(level=logging.INFO)

@@ -2,7 +2,7 @@
 import sys
 import asyncio
 from shared.services.chat_service import ChatService
-from app.models.pipeline_types import PipelineBuildResponse
+from shared.models.pipeline_types import PipelineBuildResponse
 
 async def main():
     fast = False

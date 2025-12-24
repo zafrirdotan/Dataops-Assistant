@@ -7,7 +7,7 @@ from pipeline_builder import PipelineBuilderService
 from shared.services.storage_service import MinioStorage
 import logging
 
-from app.utils.spinner_utils import run_step_with_spinner
+from shared.utils.spinner_utils import run_step_with_spinner
 logger = logging.getLogger("dataops")
 
 class ChatService:

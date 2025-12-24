@@ -3,12 +3,12 @@ import logging
 import jsonschema
 import datetime
 from yaspin import yaspin
-from app.utils.spinner_utils import run_step_with_spinner
+from shared.utils.spinner_utils import run_step_with_spinner
 import logging
 
 from shared.services.llm_service import LLMService
 from pipeline_builder.registry.pipeline_registry_service import getPipelineRegistryService
-from app.models.pipeline_types import PipelineBuildResponse
+from shared.models.pipeline_types import PipelineBuildResponse
 from .generators.pipeline_spec_generator import PipelineSpecGenerator
 from .generators.pipeline_code_generator_LLM_hybrid import PipelineCodeGeneratorLLMHybrid
 from .generators.pipeline_spec_generator import ETL_SPEC_SCHEMA
