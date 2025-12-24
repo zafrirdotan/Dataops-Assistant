@@ -1,10 +1,10 @@
 import json
 import logging
 
-from app.services.llm_service import LLMService
+from shared_services.llm_service import LLMService
 from pipeline_builder.guards.prompt_guard_service import PromptGuardService
 from pipeline_builder import PipelineBuilderService
-from app.services.storage_service import MinioStorage
+from shared_services.storage_service import MinioStorage
 import logging
 
 from app.utils.spinner_utils import run_step_with_spinner

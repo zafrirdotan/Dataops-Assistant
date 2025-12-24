@@ -5,7 +5,7 @@ import pandas as pd
 
 from app.utils.json_utils import make_json_serializable
 
-from app.services.database_service import get_database_service
+from shared_services.database_service import get_database_service
 from .local_file_service import LocalFileService
 
 class SourceService:

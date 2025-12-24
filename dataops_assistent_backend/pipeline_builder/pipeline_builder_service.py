@@ -6,7 +6,7 @@ from yaspin import yaspin
 from app.utils.spinner_utils import run_step_with_spinner
 import logging
 
-from app.services.llm_service import LLMService
+from shared_services.llm_service import LLMService
 from pipeline_builder.registry.pipeline_registry_service import getPipelineRegistryService
 from app.models.pipeline_types import PipelineBuildResponse
 from .generators.pipeline_spec_generator import PipelineSpecGenerator
@@ -14,7 +14,7 @@ from .generators.pipeline_code_generator_LLM_hybrid import PipelineCodeGenerator
 from .generators.pipeline_spec_generator import ETL_SPEC_SCHEMA
 from .sources.local_file_service import LocalFileService
 from .testing.pipeline_test_service import PipelineTestService
-from app.services.database_service import get_database_service
+from shared_services.database_service import get_database_service
 from .deployment.pipeline_output_service import PipelineOutputService
 from .sources.source_service import SourceService
 from .deployment.dockerize_service import DockerizeService

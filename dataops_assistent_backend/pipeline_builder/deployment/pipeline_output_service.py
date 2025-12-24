@@ -7,7 +7,7 @@ import uuid
 import json
 import fnmatch
 from typing import Dict, Any
-from app.services.storage_service import MinioStorage
+from shared_services.storage_service import MinioStorage
 from ..types import CodeGenResult
 
 class PipelineOutputService:

@@ -1,7 +1,7 @@
 
 import sys
 import asyncio
-from app.services.chat_service import ChatService
+from shared_services.chat_service import ChatService
 from app.models.pipeline_types import PipelineBuildResponse
 
 async def main():

@@ -135,6 +135,14 @@
       "tags": [],
       "mode": "full",
       "start_date": "2025-12-24T19:47:23.055566"
+    },
+    {
+      "id": "ingest_csv_to_parquet_and_sqlite_20251224_2011_20251224_201132_00fa303b",
+      "schedule": "0 2 * * *",
+      "description": "Ingest CSV files from the data directory into a Parquet file partitioned by date and a SQLite table named orders_daily, running daily at 02:00.",
+      "tags": [],
+      "mode": "full",
+      "start_date": "2025-12-24T20:14:57.519143"
     }
   ]
 }

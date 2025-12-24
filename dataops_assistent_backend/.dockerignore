@@ -1,0 +1,15 @@
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+__pycache__/
+.venv/
+.vscode/
+.git/
+.pytest_cache/
+tests/
+.DS_Store
+Makefile
+pytest.ini
+README.md
