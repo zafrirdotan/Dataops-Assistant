@@ -2,8 +2,8 @@ import json
 import logging
 
 from app.services.llm_service import LLMService
-from app.services.pipeline.guards.prompt_guard_service import PromptGuardService
-from app.services.pipeline import PipelineBuilderService
+from pipeline.guards.prompt_guard_service import PromptGuardService
+from pipeline import PipelineBuilderService
 from app.services.storage_service import MinioStorage
 import logging
 

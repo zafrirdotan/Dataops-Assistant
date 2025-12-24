@@ -6,7 +6,7 @@ from app.services.storage_service import MinioStorage
 from app.services.database_service import get_database_service
 import logging
 
-from app.services.pipeline.registry.pipeline_registry_service import getPipelineRegistryService
+from pipeline.registry.pipeline_registry_service import getPipelineRegistryService
 from app.logging_config import setup_logging
 
 # Configure logging

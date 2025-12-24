@@ -1,8 +1,8 @@
 from fastapi import APIRouter, HTTPException
 import logging
-from app.services.pipeline.pipeline_builder_service import PipelineBuilderService
-from app.services.pipeline.deployment.dockerize_service import DockerizeService
-from app.services.pipeline.registry.pipeline_registry_service import getPipelineRegistryService
+from pipeline.pipeline_builder_service import PipelineBuilderService
+from pipeline.deployment.dockerize_service import DockerizeService
+from pipeline.registry.pipeline_registry_service import getPipelineRegistryService
 
 logger = logging.getLogger("dataops")
 
