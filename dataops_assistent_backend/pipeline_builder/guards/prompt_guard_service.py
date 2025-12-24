@@ -9,7 +9,7 @@ import re
 import unicodedata
 from typing import Dict, List, Tuple
 
-from shared_services.llm_service import LLMService
+from shared.services.llm_service import LLMService
 
 # --- Normalization / Cleaning ---
 

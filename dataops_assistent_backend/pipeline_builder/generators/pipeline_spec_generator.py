@@ -1,5 +1,5 @@
 import json
-from shared_services.llm_service import LLMService
+from shared.services.llm_service import LLMService
 import datetime
 
 

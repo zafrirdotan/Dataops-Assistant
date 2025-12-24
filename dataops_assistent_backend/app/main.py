@@ -2,8 +2,8 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from app.routes import chat
 from app.routes import pipeline
-from shared_services.storage_service import MinioStorage
-from shared_services.database_service import get_database_service
+from shared.services.storage_service import MinioStorage
+from shared.services.database_service import get_database_service
 import logging
 
 from pipeline_builder.registry.pipeline_registry_service import getPipelineRegistryService

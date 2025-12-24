@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from shared_services.chat_service import ChatService
+from shared.services.chat_service import ChatService
 from dotenv import load_dotenv
 
 load_dotenv()
