@@ -3,6 +3,7 @@ import logging
 import jsonschema
 import datetime
 from yaspin import yaspin
+from app.utils.spinner_utils import run_step_with_spinner
 import logging
 
 from app.services.llm_service import LLMService
@@ -300,21 +301,7 @@ class PipelineBuilderService:
         Returns (result, error). If error is not None, result is None.
         """
         if mode == "cmd":
-            text = f" Step {step_number}: {step_msg}"  # Add leading space to shift spinner right
-            status_col = 65  # Column where status should start
-            # Pad text to status_col, so status always starts at the same place
-            padded_text = text.ljust(status_col)
-            spinner = yaspin(text=text, color="cyan")
-            spinner.start()
-            try:
-                result = await coro(*args, **kwargs)
-                spinner.text = ''
-                spinner.ok(f"\033[92m✔\033[0m {padded_text}\033[92mSuccess\033[0m")
-                return result, None
-            except Exception as e:
-                spinner.text = ''
-                spinner.fail(f"\033[91m✖\033[0m {padded_text}\033[91mFailed\033[0m")
-                return None, e
+            return await run_step_with_spinner(step_msg, step_number, coro, *args, **kwargs)
         else:
             try:
                 result = await coro(*args, **kwargs)
