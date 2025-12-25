@@ -184,7 +184,7 @@ class PipelineBuilderService:
 
                 test_result = {"skipped": True, "details": "Skipped tests in fast mode."}
 
-            # Register pipeline in the registry if tests passed
+            # Step 7: Register pipeline in the registry if tests passed
             if test_result.get("success") or test_result.get("skipped"):
                 build_step = "register_pipeline"
                 step_msg = "Registering pipeline in the registry..."
@@ -217,7 +217,7 @@ class PipelineBuilderService:
             self.log.info(f"[STEP: {build_step}] {step_msg}")
      
             try:
-                dockerize_result, error = await self._run_step(step_msg, step_number, self.dockerize_service.build_and_test_docker_image, pipeline_id, spec, mode=mode)
+                dockerize_result, error = await self._run_step(step_msg, step_number, self.dockerize_service.build_and_test_docker_image, pipeline_id, mode=mode)
                 self.log.info(f"Dockerize result:\n{json.dumps(dockerize_result, indent=2)}")
                 if error:
                     self.log.error(f"Failed to dockerize the pipeline: {error}")

@@ -100,8 +100,6 @@ class DockerizeService:
                     labels={"app": "dataops-assistant", "pipeline_id": pipeline_id},
                 )
 
-                await asyncio.to_thread(self.docker_client.containers.prune, filters={"label": "app=dataops-assistant"})
-
                 self.log.info(f"Docker container started for pipeline ID: {pipeline_id}, Container ID: {container.id}")
 
                 # Remove the container and image after running
@@ -112,12 +110,14 @@ class DockerizeService:
 
                 await asyncio.to_thread(container.remove, force=True)
                 await asyncio.to_thread(self.docker_client.images.remove, image=image_tag, force=True)
+
+                await asyncio.to_thread(self.docker_client.containers.prune, filters={"label": "app=dataops-assistant"})
                 self.log.info(f"Cleaned up container and image for pipeline ID: {pipeline_id}")
 
             except Exception as e:
                 self.log.error(f"Failed to start Docker container: {e}")
                 return {"success": False, "details": f"Failed to start Docker container: {e}"}
-            return {"success": True, "container_id": container.id}
+            return {"success": True}
         finally:
             # Clean up build directory
             try:
@@ -127,7 +127,7 @@ class DockerizeService:
             except Exception as cleanup_error:
                 self.log.error(f"Failed to clean up build directory: {cleanup_error}")
 
-    async def build_and_test_docker_image(self, pipeline_id: str, spec: dict) -> dict:
+    async def build_and_test_docker_image(self, pipeline_id: str) -> dict:
         """Wrapper method to build and dockerize the pipeline."""
         result = await self.dockerize_pipeline(pipeline_id, is_test=True)
         return result
