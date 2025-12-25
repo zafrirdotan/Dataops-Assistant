@@ -1,6 +1,6 @@
 from typing import TypedDict
 
 class CodeGenResult(TypedDict):
-    code: str
+    pipeline: str
     requirements: str
     tests: str
