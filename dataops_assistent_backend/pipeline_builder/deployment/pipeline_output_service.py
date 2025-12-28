@@ -7,6 +7,7 @@ import uuid
 import json
 import fnmatch
 from typing import Dict, Any
+from shared.services.local_storage_service import LocalStorageService
 from shared.services.storage_service import MinioStorage
 from ..types import CodeGenResult
 
@@ -19,6 +20,7 @@ class PipelineOutputService:
     def __init__(self):
         self.log = logging.getLogger("dataops")
         self.storage_service = MinioStorage()
+        self.local_storage_service = LocalStorageService()
         # Keep template dir for backward compatibility
         self.template_dir = os.path.dirname(__file__)
         self.env_template_path = os.path.join(self.template_dir, ".env.template")
@@ -65,7 +67,7 @@ class PipelineOutputService:
             
             # Store pipeline directly in MinIO
             self.log.info(f"Storing pipeline {pipeline_id} in MinIO...")
-            stored_files = await self.storage_service.store_pipeline(pipeline_id, pipeline_data)
+            stored_files = await self.local_storage_service.store_pipeline(pipeline_id, pipeline_data)
             
             self.log.info(f"Pipeline {pipeline_id} stored successfully in MinIO")
             
@@ -119,7 +121,7 @@ class PipelineOutputService:
             Dict[str, str]: Dictionary containing the content of the pipeline files
         """
         try:
-            stored_files = self.storage_service.retrieve_pipeline(pipeline_id)
+            stored_files = self.local_storage_service.retrieve_pipeline(pipeline_id)
             if not stored_files:
                 self.log.error(f"No files found for pipeline ID: {pipeline_id}")
                 return {}
@@ -127,50 +129,3 @@ class PipelineOutputService:
         except Exception as e:
             self.log.error(f"Failed to retrieve pipeline files from MinIO: {e}")
             return {}    
-
-    async def clean_output_files(self, spec: dict):
-        """
-        Clean up any output files generated during pipeline execution.
-        Scans ../output (relative to current working directory) and removes files or directories
-        whose name matches or contains entries from spec["destination_name"].
-        Returns a list of removed paths.
-        """
-
-        output_dir = os.path.abspath(os.path.join(os.getcwd(), 'output'))
-        name = spec.get("destination_name")
-        if not name:
-            self.log.info("No destination_name provided in spec; nothing to remove.")
-            return []
-
-        if not os.path.isdir(output_dir):
-            self.log.info(f"No output directory found at {output_dir}")
-            return []
-
-        removed_paths = []
-        patterns = [f"{name}.parquet", f"{name}.db", f"{name}.sqlite"]
-
-        entries = await asyncio.to_thread(os.listdir, output_dir)
-        print("Output directory entries:", entries)
-        for entry in entries:
-            for pattern in patterns:
-                if not pattern:
-                    continue
-                # match exact, substring or glob pattern
-                if entry == pattern or pattern in entry or fnmatch.fnmatch(entry, pattern):
-                    path = os.path.join(output_dir, entry)
-                    try:
-                        if os.path.isfile(path) or os.path.islink(path):
-                            await asyncio.to_thread(os.remove, path)
-                            print(f"Removed output file: {path}")
-                            self.log.info(f"Removed output file: {path}")
-                        elif os.path.isdir(path):
-                            # shutil.rmtree is not async, so use asyncio.to_thread
-                            await asyncio.to_thread(shutil.rmtree, path)
-                            print(f"Removed output directory: {path}")
-                            self.log.info(f"Removed output directory: {path}")
-                        removed_paths.append(path)
-                    except Exception as e:
-                        self.log.error(f"Failed to remove output {path}: {e}")
-                    break
-        
-        return removed_paths

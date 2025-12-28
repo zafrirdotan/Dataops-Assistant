@@ -121,7 +121,8 @@ class PipelineBuilderService:
                 self.log.error(f"Failed to generate pipeline code: {error}")
                 return {"error": f"Failed to generate pipeline code: {error}"}
             
-            # Step 5: Create pipeline files in MinIO (instead of local files)
+            # Step 5: Store pipeline files
+            
             build_step = "store_pipeline_files"
             step_msg = "Storing pipeline files in MinIO..."
             step_number = 5
@@ -144,10 +145,10 @@ class PipelineBuilderService:
                 self.log.error(f"Failed to store pipeline files in MinIO: {e}")
                 return {"error": f"Failed to store pipeline files: {e}"}
             
-            # Step 6: Run tests from MinIO storage
+            # Step 6: Run tests 
             if not fast:
                 build_step = "run_pipeline_tests"
-                step_msg = "Running pipeline tests from MinIO storage..."
+                step_msg = "Running pipeline tests..."
                 step_number = 6
                 self.log.info(f"[STEP: {build_step}] {step_msg}")
                 try:

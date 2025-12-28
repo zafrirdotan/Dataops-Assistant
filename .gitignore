@@ -11,6 +11,10 @@ __pycache__/
 output/*
 !output/.gitkeep
 
+# Pipelines artifacts
+pipelines/*
+!pipelines/.gitkeep
+
 # Docker volumes
 postgres_data/
 minio_data/
@@ -24,3 +28,5 @@ airflow/logs/
 
 # Python virtual environment
 venv/
+
+airflow/dags/pipelines

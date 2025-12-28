@@ -36,6 +36,7 @@ services:
     volumes:
       - ${HOST_DATA_PATH}:/app/data
       - ${HOST_OUTPUT_PATH}:/app/output
+      - ${HOST_PIPELINES_PATH}:/app/pipelines
       - /var/run/docker.sock:/var/run/docker.sock
       - ./airflow/dags/pipelines/catalog.json:/app/catalog.json
 

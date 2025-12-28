@@ -67,41 +67,6 @@ class MinioStorage:
             "pipeline-tests": "pipeline-tests", # Test files and results
             "pipeline-logs": "pipeline-logs"    # Execution logs
         }
-        
-        # Initialize buckets asynchronously (will be called from startup)
-        # asyncio.create_task(self._initialize_pipeline_buckets())
-
-    def object_key(self, filename: str, prefix: str = "uploads/") -> str:
-        safe = sanitize_filename(filename)
-        return f"{prefix}{int(time.time())}_{safe}"
-
-    def presigned_put(self, filename: str, content_type: Optional[str] = None, prefix: str = "uploads/"):
-        key = self.object_key(filename, prefix)
-        params = {"Bucket": self.bucket, "Key": key}
-        if content_type:
-            params["ContentType"] = content_type
-
-        url = self.client.generate_presigned_url(
-            "put_object", Params=params, ExpiresIn=self.expires
-        )
-
-        public_url = f"{self.public_base_url}/{self.bucket}/{key}"
-        return {"upload_url": url, "object_key": key, "public_url": public_url, "expires_in": self.expires}
-
-    def presigned_get(self, key: str):
-        url = self.client.generate_presigned_url(
-            "get_object",
-            Params={"Bucket": self.bucket, "Key": key},
-            ExpiresIn=self.expires,
-        )
-        return {"download_url": url, "expires_in": self.expires}
-
-    def direct_put_bytes(self, key: str, data: bytes, content_type: Optional[str] = None):
-        extra = {}
-        if content_type:
-            extra["ContentType"] = content_type
-        self.client.put_object(Bucket=self.bucket, Key=key, Body=data, **extra)
-        return {"object_key": key, "public_url": f"{self.public_base_url}/{self.bucket}/{key}"}
 
     # Pipeline Management Methods
     async def initialize_pipeline_buckets(self):
@@ -360,18 +325,6 @@ class MinioStorage:
         parts = s3_path.replace("s3://", "").split("/", 1)
         return parts[0], parts[1] if len(parts) > 1 else ""
 
-    def generate_presigned_url(self, bucket: str, object_name: str, expires: int = 3600) -> str:
-        """Generate presigned URL for file download"""
-        try:
-            url = self.client.generate_presigned_url(
-                'get_object',
-                Params={'Bucket': bucket, 'Key': object_name},
-                ExpiresIn=expires
-            )
-            return url
-        except ClientError as e:
-            self.logger.error(f"Error generating presigned URL: {e}")
-            raise
 
     async def get_storage_status(self) -> Dict[str, Any]:
         """Get MinIO storage status and bucket information"""
