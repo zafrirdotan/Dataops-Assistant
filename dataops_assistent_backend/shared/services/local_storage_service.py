@@ -102,6 +102,9 @@ class LocalStorageService:
 					with open(file_path, "r", encoding="utf-8") as f:
 						pipeline_data[file_type] = f.read()
 
+			# Add metadata to the returned dictionary
+			pipeline_data['metadata'] = metadata
+
 			return pipeline_data
 		except Exception as e:
 			import logging

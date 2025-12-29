@@ -157,11 +157,11 @@ class PipelineCodeGeneratorLLMHybrid:
         prompt_details = {
             "parquet": (
                 "The destination is Parquet files. "
-                "The output folder is specified in os.getenv('OUTPUT_FOLDER', './output_test'). "
+                "The output folder is os.getenv('OUTPUT_FOLDER', './output')/pipeline_id/parquet. "
             ),
             "sqlite": (
-                "The destination is a SQLite files. "
-                 "The output folder is specified in os.getenv('OUTPUT_FOLDER', './output_test'). "
+                "The destination is a SQLite file. "
+                "The output folder is os.getenv('OUTPUT_FOLDER', './output')/pipeline_id/sqlite. "
             ),
             "PostgreSQL": (
                 "The destination is a Postgres database. "
@@ -339,22 +339,32 @@ def load_data(data):
         
         elif destination_type == "parquet":
             return """
-        def load_data(data):
-            try:
-                output_folder = os.getenv('OUTPUT_FOLDER', './output_test')
-                # Only create the directory if it does not exist
-                if not os.path.exists(output_folder):
-                    os.makedirs(output_folder)
-                output_path = os.path.join(output_folder, 'output.parquet')
-                data.to_parquet(output_path, index=False)
-            except Exception as e:
-                logging.error(f"Error loading data to Parquet: {str(e)}")
+def load_data(data):
+    try:
+        metadata_path = os.path.join(os.path.dirname(__file__), 'metadata.json')
+        with open(metadata_path, 'r') as f:
+            metadata = json.load(f)
+        pipeline_id = metadata.get('pipeline_id')
+        base_output = os.getenv('OUTPUT_FOLDER', './output')
+        output_folder = os.path.join(base_output, pipeline_id)
+        # Only create the directory if it does not exist
+        if not os.path.exists(output_folder):
+            os.makedirs(output_folder)
+        output_path = os.path.join(output_folder, 'output.parquet')
+        data.to_parquet(output_path, index=False)
+    except Exception as e:
+        logging.error(f"Error loading data to Parquet: {str(e)}")
             """
         elif destination_type == "sqlite":
             return """
 def load_data(data):
     try:
-        output_folder = os.getenv('OUTPUT_FOLDER', './output_test')
+        metadata_path = os.path.join(os.path.dirname(__file__), 'metadata.json')
+        with open(metadata_path, 'r') as f:
+            metadata = json.load(f)
+        pipeline_id = metadata.get('pipeline_id')
+        base_output = os.getenv('OUTPUT_FOLDER', './output')
+        output_folder = os.path.join(base_output, pipeline_id)
         # Only create the directory if it does not exist
         if not os.path.exists(output_folder):
             os.makedirs(output_folder)
@@ -380,9 +390,15 @@ import pytest
 import pandas as pd
 import sys
 import os
+import pipeline
+
 
 # Add the pipeline directory to the path
 sys.path.append(os.path.dirname(__file__))
+
+pipeline_id = pipeline.get_pipeline_id()
+base_output = os.getenv('OUTPUT_FOLDER', './output')
+output_folder = os.path.join(base_output, pipeline_id)
 
 try:
     from pipeline import main

@@ -1,3 +1,4 @@
+import json
 import os
 import sys
 import asyncio
@@ -40,6 +41,7 @@ class PipelineTestService:
             
             # Write pipeline files to temp directory
             pipeline_file = os.path.join(execution_dir, "pipeline.py")
+            meta_file = os.path.join(execution_dir, "metadata.json")
             test_file = os.path.join(execution_dir, "test.py")
             requirements_file = os.path.join(execution_dir, "requirements.txt")
             env_file = os.path.join(execution_dir, ".env")
@@ -48,6 +50,10 @@ class PipelineTestService:
             try:
                 async with aiofiles.open(pipeline_file, 'w') as f:
                     await f.write(stored_files.get('pipeline', ''))
+
+                metadata_content = json.dumps(stored_files.get('metadata', ''), indent=2)
+                async with aiofiles.open(meta_file, 'w') as f:
+                    await f.write(metadata_content)
                 
                 async with aiofiles.open(test_file, 'w') as f:
                     await f.write(stored_files.get('test_code', ''))
