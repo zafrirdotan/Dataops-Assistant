@@ -14,6 +14,14 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY . .
 
+# Create the shared venv and install core packages at build time
+RUN python3 -m venv /app/.venvs/shared && \
+        /app/.venvs/shared/bin/pip install --upgrade pip && \
+        if [ -f /app/venv-requirements.txt ]; then \
+            /app/.venvs/shared/bin/pip install -r /app/venv-requirements.txt; \
+        fi
+
+
 # Create data directory
 RUN mkdir -p /app/data
 

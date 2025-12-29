@@ -43,6 +43,23 @@ services:
     networks:
       - dataops-assistant-net
 
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "test",
+          "-d",
+          "/app/.venvs/shared",
+          "&&",
+          "test",
+          "-f",
+          "/app/.venvs/shared/bin/activate",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
   data-loader:
     build: ./data-loader-service
     restart: "no" # Run once and stop

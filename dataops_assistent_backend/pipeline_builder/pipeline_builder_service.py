@@ -152,7 +152,7 @@ class PipelineBuilderService:
                 step_number = 6
                 self.log.info(f"[STEP: {build_step}] {step_msg}")
                 try:
-                    test_result, error = await self._run_step(step_msg, step_number, self.test_service.run_pipeline_test_in_venv,
+                    test_result, error = await self._run_step(step_msg, step_number, self.test_service.run_pipeline_test_in_venv_v2,
                         pipeline_id,  # Pass pipeline_id instead of folder path
                         mode=mode
                     )
