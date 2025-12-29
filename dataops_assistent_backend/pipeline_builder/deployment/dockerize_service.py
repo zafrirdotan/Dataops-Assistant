@@ -131,3 +131,78 @@ class DockerizeService:
         """Wrapper method to build and dockerize the pipeline."""
         result = await self.dockerize_pipeline(pipeline_id, is_test=True)
         return result
+
+    async def test_pipeline_in_docker(self, pipeline_id: str) -> dict:
+        """
+        Use the test-runner image to run tests for the given pipeline_id.
+        Copies pipeline files to a temp dir, mounts it into the test-runner container, and runs pytest.
+        """
+        import tempfile
+        try:
+            stored_files = await self.output_service.get_pipeline_files(pipeline_id)
+            if not stored_files:
+                self.log.error(f"No files found for pipeline ID: {pipeline_id}")
+                return {"success": False, "details": "No files found for the given pipeline ID."}
+        except Exception as e:
+            self.log.error(f"Failed to retrieve pipeline files: {e}")
+            return {"success": False, "details": f"Failed to retrieve pipeline files: {e}"}
+
+        self.log.info(f"Retrieved files for pipeline ID: {pipeline_id}")
+
+        # Use a named Docker volume 'pipeline-test' for /app/pipeline
+        try:
+            # Ensure the volume exists
+            volume_name = "pipeline-test"
+            try:
+                self.docker_client.volumes.get(volume_name)
+            except docker.errors.NotFound:
+                self.docker_client.volumes.create(name=volume_name)
+
+            import tempfile
+            from shared.copy_to_volume import copy_to_volume
+            # Create a temp dir and write the files to it
+            with tempfile.TemporaryDirectory() as temp_dir:
+                with open(os.path.join(temp_dir, "pipeline.py"), "w") as f:
+                    f.write(stored_files.get('pipeline', ''))
+                with open(os.path.join(temp_dir, "test.py"), "w") as f:
+                    f.write(stored_files.get('test_code', ''))
+                with open(os.path.join(temp_dir, "requirements.txt"), "w") as f:
+                    f.write(stored_files.get('requirements', ''))
+                with open(os.path.join(temp_dir, ".env"), "w") as f:
+                    f.write(open(self.env_test_template_path, "r").read())
+                # Copy all files in temp_dir to the volume
+                copy_to_volume(volume_name, temp_dir, dest_path="/app/pipeline")
+            self.log.info(f"Pipeline test files written to Docker volume: {volume_name}")
+        except Exception as e:
+            self.log.error(f"Failed to write pipeline test files to Docker volume: {e}")
+            return {"success": False, "details": f"Failed to write pipeline test files to Docker volume: {e}"}
+
+        # Run the test-runner container with the named volume mounted
+        try:
+            container = await asyncio.to_thread(
+                self.docker_client.containers.run,
+                image="dataops-assistant-test-runner:latest",
+                command=["pytest", "/app/pipeline/test.py"],
+                volumes={
+                    volume_name: {"bind": "/app/pipeline", "mode": "rw"}
+                },
+                working_dir="/app/pipeline",
+                detach=True,
+                network=self.network_name,
+                labels={"app": "dataops-assistant", "pipeline_id": pipeline_id},
+            )
+            self.log.info(f"Started test-runner container for pipeline ID: {pipeline_id}, Container ID: {container.id}")
+            await asyncio.to_thread(container.wait)
+            logs = await asyncio.to_thread(container.logs)
+            logs = logs.decode('utf-8')
+            self.log.info(f"Test-runner container logs:\n{logs}")
+            exit_code = container.attrs['State']['ExitCode']
+            await asyncio.to_thread(container.remove, force=True)
+            if exit_code == 0:
+                return {"success": True, "details": "All tests passed", "logs": logs}
+            else:
+                return {"success": False, "details": "Tests failed", "logs": logs}
+        except Exception as e:
+            self.log.error(f"Failed to run test-runner container: {e}")
+            return {"success": False, "details": f"Failed to run test-runner container: {e}"}
+            

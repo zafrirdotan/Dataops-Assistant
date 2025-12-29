@@ -39,6 +39,9 @@ services:
       - ${HOST_PIPELINES_PATH}:/app/pipelines
       - /var/run/docker.sock:/var/run/docker.sock
       - ./airflow/dags/pipelines/catalog.json:/app/catalog.json
+      # Mount local pipeline_builder and shared for live editing
+      - ./dataops_assistent_backend/pipeline_builder:/app/pipeline_builder
+      - ./dataops_assistent_backend/shared:/app/shared
 
     networks:
       - dataops-assistant-net
@@ -59,6 +62,16 @@ services:
       timeout: 10s
       retries: 3
       start_period: 10s
+
+  test-runner:
+    build: ./testrunner
+    image: dataops-assistant-test-runner:latest
+    volumes:
+      - ./pipelines:/app/pipeline:ro
+    working_dir: /app/pipeline
+    entrypoint: ["pytest"]
+    networks:
+      - dataops-assistant-net
 
   data-loader:
     build: ./data-loader-service

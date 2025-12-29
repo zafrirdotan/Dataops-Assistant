@@ -438,7 +438,6 @@ if __name__ == "__main__":
             "sqlalchemy>=2.0.0",
             "psycopg2-binary>=2.9.0",
             "pyarrow>=14.0.0",
-            "requests>=2.31.0",
             "pytest>=7.0.0",
             "python-dotenv>=1.0.0",
             "minio"

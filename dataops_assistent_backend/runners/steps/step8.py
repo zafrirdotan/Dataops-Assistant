@@ -8,7 +8,7 @@ from shared.utils.spinner_utils import run_step_with_spinner
 logger = logging.getLogger("dataops")
 dockerize_service = DockerizeService(logger)
 
-pipeline_id = "mock_etl_pipeline_20251225_132447_5b8a3759"
+pipeline_id = "bank_transactions_to_parquet_and_sqlite_20251228_1320_20251228_132029_1920b598"
 spec = {
     "pipeline_name": "mock_etl_pipeline"
 }
@@ -16,7 +16,7 @@ spec = {
 async def main():
     step_msg = "Step 8: Dockerizing and deploying the pipeline..."
     step_number = 8
-    dockerize_result, error = await run_step_with_spinner(step_msg, step_number, dockerize_service.build_and_test_docker_image,
+    dockerize_result, error = await run_step_with_spinner(step_msg, step_number, dockerize_service.test_pipeline_in_docker,
         pipeline_id,
     )
     print(step_msg)

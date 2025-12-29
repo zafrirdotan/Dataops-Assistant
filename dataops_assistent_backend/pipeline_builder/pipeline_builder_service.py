@@ -218,7 +218,7 @@ class PipelineBuilderService:
             self.log.info(f"[STEP: {build_step}] {step_msg}")
      
             try:
-                dockerize_result, error = await self._run_step(step_msg, step_number, self.dockerize_service.build_and_test_docker_image, pipeline_id, mode=mode)
+                dockerize_result, error = await self._run_step(step_msg, step_number, self.dockerize_service.test_pipeline_in_docker, pipeline_id, mode=mode)
                 self.log.info(f"Dockerize result:\n{json.dumps(dockerize_result, indent=2)}")
                 if error:
                     self.log.error(f"Failed to dockerize the pipeline: {error}")
