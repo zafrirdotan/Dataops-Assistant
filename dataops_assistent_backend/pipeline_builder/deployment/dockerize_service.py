@@ -6,6 +6,7 @@ import asyncio
 import json
 
 from ..deployment.pipeline_output_service import PipelineOutputService
+
 class DockerizeService:
     """Service to dockerize pipeline deployments."""
     def __init__(self, log):
@@ -14,6 +15,8 @@ class DockerizeService:
         self.docker_client = docker.from_env()
         self.network_name = "dataops-assistant-net"
         self.env_test_template_path = os.path.join(os.path.dirname(__file__), "../testing/.env.test_template")
+        self.host_data_path = os.getenv("HOST_DATA_PATH", "/Users/yourusername/project/data")
+        self.host_output_path = os.getenv("HOST_OUTPUT_PATH", "/Users/yourusername/project/output")
 
     async def dockerize_pipeline(self, pipeline_id: str, is_test: bool = False) -> dict:
         # Step 1: Retrieve pipeline files from MinIO
@@ -83,9 +86,6 @@ class DockerizeService:
         
             # Step 4: Run the container and connect it to the network
             try:
-                host_data_path = os.getenv("HOST_DATA_PATH", "/Users/yourusername/project/data")
-                host_output_path = os.getenv("HOST_OUTPUT_PATH", "/Users/yourusername/project/output")
-
                 container = await asyncio.to_thread(
                     self.docker_client.containers.run,
                     image_tag,
@@ -93,8 +93,8 @@ class DockerizeService:
                     network=self.network_name,
                     name=container_name,
                     volumes={
-                        os.path.abspath(host_data_path): {"bind": "/app/data", "mode": "ro"},
-                        os.path.abspath(host_output_path): {"bind": "/app/output", "mode": "rw"},
+                        os.path.abspath(self.host_data_path): {"bind": "/app/data", "mode": "ro"},
+                        os.path.abspath(self.host_output_path): {"bind": "/app/output", "mode": "rw"},
                     },
                     labels={"app": "dataops-assistant", "pipeline_id": pipeline_id},
                 )
@@ -260,8 +260,7 @@ class DockerizeService:
             return {"success": False, "details": f"Failed to build Docker image: {e}"}
 
         # Start the container and return its ID
-        host_data_path = os.getenv("HOST_DATA_PATH", "/Users/yourusername/project/data")
-        host_output_path = os.getenv("HOST_OUTPUT_PATH", "/Users/yourusername/project/output")
+   
         container_name = f"pipeline_{pipeline_id}_container"
         try:
             # Remove existing container with the same name if it exists
@@ -279,35 +278,44 @@ class DockerizeService:
                 network=self.network_name,
                 name=container_name,
                 volumes={
-                    os.path.abspath(host_data_path): {"bind": "/app/data", "mode": "ro"},
-                    os.path.abspath(host_output_path): {"bind": "/app/output", "mode": "rw"},
+                    os.path.abspath(self.host_data_path): {"bind": "/app/data", "mode": "ro"},
+                    os.path.abspath(self.host_output_path): {"bind": "/app/output", "mode": "rw"},
                 },
                 labels={"app": "dataops-assistant", "pipeline_id": pipeline_id},
             )
-            self.log.info(f"Docker container started for pipeline ID: {pipeline_id}, Container ID: {container.id}")
-            return {"success": True, "container_id": container.id}
+            self.log.info(f"Docker container created for pipeline ID: {pipeline_id}, Container ID: {container.id}")
+            # Remove the container immediately after creation (test only)
+            await asyncio.to_thread(container.remove, force=True)
+            self.log.info(f"Docker container removed for pipeline ID: {pipeline_id}, Container ID: {container.id}")
+            return {"success": True, "image_id": image.id}
         except Exception as e:
-            self.log.error(f"Failed to start Docker container: {e}")
-            return {"success": False, "details": f"Failed to start Docker container: {e}"}
+            self.log.error(f"Failed to create/remove Docker container: {e}")
+            return {"success": False, "details": f"Failed to create/remove Docker container: {e}"}
 
 
-    async def run_pipeline_in_container(self, container_id: str) -> dict:
+    async def run_pipeline_in_container(self, image_id: str) -> dict:
         """
-        Given a container ID, asynchronously wait for it to finish and return the logs and exit status.
+        Given an image ID, create and run a new container, wait for it to finish, and return the logs and exit status.
         """
         try:
-            container = await asyncio.to_thread(self.docker_client.containers.get, container_id)
-            # Start the container if it is not running
-            container_status = container.attrs['State']['Status']
-            if container_status != 'running':
-                await asyncio.to_thread(container.start)
-                self.log.info(f"Started container {container_id} (was {container_status})")
+            container = await asyncio.to_thread(
+                self.docker_client.containers.run,
+                image_id,
+                detach=True,
+                network=self.network_name,
+                    volumes={
+                        os.path.abspath(self.host_data_path): {"bind": "/app/data", "mode": "ro"},
+                        os.path.abspath(self.host_output_path): {"bind": "/app/output", "mode": "rw"},
+                    },
+                labels={"app": "dataops-assistant"},
+            )
+            self.log.info(f"Started container from image {image_id}, Container ID: {container.id}")
             await asyncio.to_thread(container.wait)
             logs = await asyncio.to_thread(container.logs)
             logs = logs.decode('utf-8')
             exit_code = container.attrs['State']['ExitCode']
             self.log.info(f"Container logs:\n{logs}")
-            await asyncio.to_thread(container.stop)
+            await asyncio.to_thread(container.remove, force=True)
             if exit_code == 0:
                 return {"success": True, "details": "Pipeline ran successfully", "logs": logs}
             else:
