@@ -278,7 +278,7 @@ class PipelineBuilderService:
                 # Run the pipeline once after deployment
                 self.log.info("Running the pipeline once after deployment...")
                 run_result, error = await self._run_step( step_msg, step_number,
-                    self.dockerize_service.run_pipeline_in_container, dockerize_result.get("container_id"))
+                    self.dockerize_service.run_pipeline_in_container, dockerize_result.get("image_id"),)
                 if error:
                     self.log.error(f"Failed to run the pipeline after deployment: {error}")
                 else:
