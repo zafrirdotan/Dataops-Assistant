@@ -63,18 +63,12 @@ class PipelineBuilderService:
         return True
 
 
-    async def build_pipeline(self, user_input: str, fast: bool = False, mode: str = "chat", debug: bool = False) -> PipelineBuildResponse:
+    async def build_pipeline(self, user_input: str, fast: bool = False, mode: str = "chat", run_after_deploy: bool = False) -> PipelineBuildResponse:
         """
         Build a pipeline using the new template-based approach.
         This is a more efficient alternative to the full build_pipeline method.
         """
         try:
-            # Set logging level for cmd users
-            if mode == "cmd":
-                if debug:
-                    logging.getLogger().setLevel(logging.INFO)
-                else:
-                    logging.getLogger().setLevel(logging.WARNING)
 
             start_time = datetime.datetime.now()
             # Step 1: Generate pipeline specification
@@ -278,6 +272,18 @@ class PipelineBuilderService:
                 }
             )
 
+            if run_after_deploy:
+                step_msg = "Running the pipeline once after deployment..."
+                step_number = 11
+                # Run the pipeline once after deployment
+                self.log.info("Running the pipeline once after deployment...")
+                run_result, error = await self._run_step( step_msg, step_number,
+                    self.dockerize_service.run_pipeline_in_container, dockerize_result.get("container_id"))
+                if error:
+                    self.log.error(f"Failed to run the pipeline after deployment: {error}")
+                else:
+                    self.log.info(f"Pipeline run result after deployment:\n{json.dumps(run_result, indent=2)}")
+
             execution_time = (datetime.datetime.now() - start_time).seconds
             message = f"Pipeline created successfully in {execution_time} seconds"
             
@@ -300,12 +306,15 @@ class PipelineBuilderService:
                 "execution_time": execution_time
             }
 
+            if run_after_deploy:
+                response["run_result_after_deploy"] = run_result
+
             self.log.info("Pipeline build response:\n%s", json.dumps(response, indent=2))
             
             return response
             
         except Exception as e:
-            self.log.error(f"Template-based pipeline creation failed: {e}")
+            self.log.error(f"Failed to create pipeline: {e}")
             return {
                 "success": False,
                 "pipeline_name": spec.get("pipeline_name"),

@@ -205,7 +205,7 @@ class DockerizeService:
             self.log.error(f"Failed to run test-runner container: {e}")
             return {"success": False, "details": f"Failed to run test-runner container: {e}"}
 
-    async def dockerize_pipeline_v2(self, pipeline_id: str, is_test: bool = False) -> dict:
+    async def dockerize_pipeline_v2(self, pipeline_id: str) -> dict:
         """
         Build and start a pipeline container, returning the container ID. Reuses build context if it exists.
         """

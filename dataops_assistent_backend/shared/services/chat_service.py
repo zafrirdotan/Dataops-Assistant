@@ -18,7 +18,7 @@ class ChatService:
         self.pipeline_builder_service = PipelineBuilderService()
         self.storage_service = MinioStorage()
 
-    async def process_message(self, raw_message: str, fast: bool = False, mode: str = "chat") -> dict:
+    async def process_message(self, raw_message: str, fast: bool = False, mode: str = "chat", run_after_deploy: bool = False) -> dict:
         """
         Process the user message, validate it, and get a response from the LLM.
         """
@@ -35,7 +35,7 @@ class ChatService:
             self.logger.error(f"Error during input guards: {guard_error}")
             return {"guard_decision": "block", "error": str(guard_error)}
        
-        build_spec = await self.pipeline_builder_service.build_pipeline(guard_result["cleaned_input"], fast=fast, mode=mode)
+        build_spec = await self.pipeline_builder_service.build_pipeline(guard_result["cleaned_input"], fast=fast, mode=mode, run_after_deploy=run_after_deploy)
                
 
         return {

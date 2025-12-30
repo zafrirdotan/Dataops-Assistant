@@ -22,7 +22,7 @@ async def main():
 ──────────────────────────────────────────────────────────────
           """)
     
-    pipeline_result = await chat_service.process_message(message, fast=fast, mode="cmd")
+    pipeline_result = await chat_service.process_message(message, fast=fast, mode="cmd", run_after_deploy=True)
     pretty_print_pipeline_result(pipeline_result)
     
 
