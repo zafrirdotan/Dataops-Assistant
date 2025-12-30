@@ -1,13 +1,9 @@
 # Basic Dockerfile for a Python service
-FROM python:3.11-slim
+FROM dataops-pipeline-base:latest
 
 WORKDIR /app
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+COPY pipeline.py ./
 
-COPY . /app
-
-ENV PYTHONUNBUFFERED=1
 
 CMD ["python", "pipeline.py"]

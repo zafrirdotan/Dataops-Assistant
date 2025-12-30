@@ -16,9 +16,17 @@ spec = {
 async def main():
     step_msg = "Step 8: Dockerizing and deploying the pipeline..."
     step_number = 8
-    dockerize_result, error = await run_step_with_spinner(step_msg, step_number, dockerize_service.test_pipeline_in_docker,
-        pipeline_id,
+    # dockerize_result, error = await run_step_with_spinner(step_msg, step_number, dockerize_service.dockerize_pipeline_v2,
+    #     pipeline_id,
+    # )
+    # print(step_msg)
+    # print("Dockerize result:", json.dumps(dockerize_result))
+    # print("Error:", error)
+
+    run_pipeline_result, error = await run_step_with_spinner("Running the dockerized pipeline...", step_number + 1,
+        dockerize_service.run_pipeline_in_container,
+       "5b29f0e0fc571583c89d34ba8a8a221b8f7d38908ac7558986b43d073cece49a"
     )
-    print(step_msg)
-    print("Dockerize result:", json.dumps(dockerize_result))
+
+    print("Run pipeline result:", json.dumps(run_pipeline_result))
     print("Error:", error)

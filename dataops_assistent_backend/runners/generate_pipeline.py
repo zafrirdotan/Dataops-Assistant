@@ -38,6 +38,7 @@ def pretty_print_pipeline_result(pipeline_result):
     rows = [
         ("Pipeline Name", build_spec.get('pipeline_name', 'N/A')),
         ("Pipeline ID", build_spec.get('pipeline_id', 'N/A')),
+        ("Container ID", build_spec.get('container_id', 'N/A')),
         ("Build Steps Completed", build_spec.get('build_steps_completed', 'N/A')),
         ("Success", build_spec.get('success', 'N/A')),
         ("Message", build_spec.get('message', 'N/A')),

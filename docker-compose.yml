@@ -42,6 +42,7 @@ services:
       # Mount local pipeline_builder and shared for live editing
       - ./dataops_assistent_backend/pipeline_builder:/app/pipeline_builder
       - ./dataops_assistent_backend/shared:/app/shared
+      - ./dataops_assistent_backend/runners:/app/runners
 
     networks:
       - dataops-assistant-net
@@ -72,6 +73,13 @@ services:
     entrypoint: ["pytest"]
     networks:
       - dataops-assistant-net
+
+  base-pipeline:
+    build:
+      context: ./base_pipeline_image
+      dockerfile: base.Dockerfile
+    image: dataops-pipeline-base:latest
+    entrypoint: ["echo", "Base pipeline image built"]
 
   data-loader:
     build: ./data-loader-service

@@ -211,36 +211,53 @@ class PipelineBuilderService:
                 
             # TODO: Step 7: Iterate to perfect the pipeline based on test results (if needed)
 
-            # Step 8: Dockerize and deploy the pipeline
-            build_step = "dockerize_pipeline"
-            step_msg = "Dockerizing and deploying the pipeline..."
+            # Step 8: Test code in docker container - test runner
+            build_step = "Test_pipeline_in_docker"
+            step_msg = "Testing the pipeline in Docker container..."
             step_number = 8
             self.log.info(f"[STEP: {build_step}] {step_msg}")
      
             try:
-                dockerize_result, error = await self._run_step(step_msg, step_number, self.dockerize_service.test_pipeline_in_docker, pipeline_id, mode=mode)
-                self.log.info(f"Dockerize result:\n{json.dumps(dockerize_result, indent=2)}")
+                test_runner_result, error = await self._run_step(step_msg, step_number, self.dockerize_service.test_pipeline_in_docker, pipeline_id, mode=mode)
+                self.log.info(f"Test runner result:\n{json.dumps(test_runner_result, indent=2)}")
                 if error:
-                    self.log.error(f"Failed to dockerize the pipeline: {error}")
-                    return {"success": False, "details": f"Failed to dockerize the pipeline: {error}"}
+                    self.log.error(f"Test runner failed: {error}")
+                    return {"success": False, "details": f"Failed to test the pipeline in Docker container: {error}"}
             except Exception as e:
-                self.log.error(f"Failed to dockerize the pipeline: {e}")
-                return {"success": False, "details": f"Failed to dockerize the pipeline: {e}"}
-            if not dockerize_result.get("success"):
+                self.log.error(f"Failed to test the pipeline in Docker container: {e}")
+                return {"success": False, "details": f"Failed to test the pipeline in Docker container: {e}"}
+            if not test_runner_result.get("success"):
                 self.log.error("Dockerization failed.")
                 return {
                     "pipeline_name": spec.get("pipeline_name"),
                     "build_steps_completed": build_step,
                     "pipeline_id": pipeline_id,
                     "success": False,
-                    "error": "Dockerization failed.",
-                    "dockerize_result": dockerize_result
+                    "error": "Docker test in test runner failed.",
+                    "test_runner_result": test_runner_result
                 }
             
-            # Step 9: Scheduling in airflow
+            # Step 9: Dockerizeition 
+            build_step = "Dockerizeition"
+            step_msg = "Dockerizing and deploying the pipeline..."
+            step_number = 9
+            self.log.info(f"[STEP: {build_step}] {step_msg}")
+            try:
+                dockerize_result, error = await self._run_step(step_msg, step_number, self.dockerize_service.dockerize_pipeline_v2,
+                    pipeline_id,
+                )
+                self.log.info(f"Dockerizeition result:\n{json.dumps(dockerize_result, indent=2)}")
+                if error:
+                    self.log.error(f"Dockerizeition failed: {error}")
+                    return {"success": False, "details": f"Failed to Dockerize the pipeline: {error}"}
+            except Exception as e:
+                self.log.error(f"Failed to Dockerize the pipeline: {e}")
+                return {"success": False, "details": f"Failed to Dockerize the pipeline: {e}"}
+            
+            # Step 10: Scheduling in airflow
             build_step = "schedule_pipeline"
             step_msg = "Scheduling the pipeline..."
-            step_number = 9
+            step_number = 10
             self.log.info(f"[STEP: {build_step}] {step_msg}")
 
             if spec.get("schedule") and spec.get("schedule") != "manual":
@@ -271,12 +288,14 @@ class PipelineBuilderService:
             response = {
                 "pipeline_name": spec.get("pipeline_name"),
                 "pipeline_id": pipeline_id, 
+                "container_id": dockerize_result.get("container_id"),
+                "dockerize_result": dockerize_result,
                 "build_steps_completed": build_step,
                 "success": True,
                 "request_spec": spec,
                 "test_result": test_result,
                 "message": message,
-                "dockerize_result": dockerize_result ,
+                "test_runner_result": test_runner_result ,
                 "scheduling_result": scheduled_result,
                 "execution_time": execution_time
             }

@@ -1,10 +1,9 @@
-
-
 import docker 
 import os
 import aiofiles
 import shutil
 import asyncio
+import json
 
 from ..deployment.pipeline_output_service import PipelineOutputService
 class DockerizeService:
@@ -205,4 +204,114 @@ class DockerizeService:
         except Exception as e:
             self.log.error(f"Failed to run test-runner container: {e}")
             return {"success": False, "details": f"Failed to run test-runner container: {e}"}
-            
+
+    async def dockerize_pipeline_v2(self, pipeline_id: str, is_test: bool = False) -> dict:
+        """
+        Build and start a pipeline container, returning the container ID. Reuses build context if it exists.
+        """
+        import aiofiles
+        build_dir = f"/tmp/pipeline_builds/{pipeline_id}"
+        os.makedirs(build_dir, exist_ok=True)
+        try:
+            stored_files = await self.output_service.get_pipeline_files(pipeline_id)
+            if not stored_files:
+                self.log.error(f"No files found for pipeline ID: {pipeline_id}")
+                return {"success": False, "details": "No files found for the given pipeline ID."}
+        except Exception as e:
+            self.log.error(f"Failed to retrieve pipeline files: {e}")
+            return {"success": False, "details": f"Failed to retrieve pipeline files: {e}"}
+
+        # Write pipeline files to build context
+        pipeline_file = os.path.join(build_dir, "pipeline.py")
+        dockerfile_path = os.path.join(build_dir, "Dockerfile")
+        metadata_file = os.path.join(build_dir, "metadata.json")   
+
+        async with aiofiles.open(pipeline_file, 'w') as f:
+            await f.write(stored_files.get('pipeline', ''))
+        # Write metadata file
+        async with aiofiles.open(metadata_file, 'w') as f:
+            await f.write(json.dumps(stored_files.get('metadata', '')))
+
+        # Generate Dockerfile from template
+        template_path = os.path.join(os.path.dirname(__file__), "Dockerfile.template")
+        with open(template_path, "r") as tpl:
+            dockerfile_content = tpl.read()
+        with open(dockerfile_path, "w") as df:
+            df.write(dockerfile_content)
+
+        # Build the Docker image
+        image_tag = f"pipeline-{pipeline_id}:latest"
+        try:
+            image, logs = self.docker_client.images.build(
+                path=build_dir,
+                tag=image_tag,
+                rm=True,
+                forcerm=True,
+                pull=False,
+            )
+            for log in logs:
+                if 'stream' in log:
+                    self.log.debug(log['stream'].strip())
+                else:
+                    self.log.debug(log)
+            self.log.info(f"Docker image built successfully for pipeline ID: {pipeline_id}")
+        except Exception as e:
+            self.log.error(f"Failed to build Docker image: {e}")
+            return {"success": False, "details": f"Failed to build Docker image: {e}"}
+
+        # Start the container and return its ID
+        host_data_path = os.getenv("HOST_DATA_PATH", "/Users/yourusername/project/data")
+        host_output_path = os.getenv("HOST_OUTPUT_PATH", "/Users/yourusername/project/output")
+        container_name = f"pipeline_{pipeline_id}_container"
+        try:
+            # Remove existing container with the same name if it exists
+            try:
+                existing_container = await asyncio.to_thread(self.docker_client.containers.get, container_name)
+                await asyncio.to_thread(existing_container.remove, force=True)
+                self.log.info(f"Removed existing container with name: {container_name}")
+            except Exception:
+                pass  # Container does not exist, continue
+
+            container = await asyncio.to_thread(
+                self.docker_client.containers.create,
+                image_tag,
+                detach=True,
+                network=self.network_name,
+                name=container_name,
+                volumes={
+                    os.path.abspath(host_data_path): {"bind": "/app/data", "mode": "ro"},
+                    os.path.abspath(host_output_path): {"bind": "/app/output", "mode": "rw"},
+                },
+                labels={"app": "dataops-assistant", "pipeline_id": pipeline_id},
+            )
+            self.log.info(f"Docker container started for pipeline ID: {pipeline_id}, Container ID: {container.id}")
+            return {"success": True, "container_id": container.id}
+        except Exception as e:
+            self.log.error(f"Failed to start Docker container: {e}")
+            return {"success": False, "details": f"Failed to start Docker container: {e}"}
+
+
+    async def run_pipeline_in_container(self, container_id: str) -> dict:
+        """
+        Given a container ID, asynchronously wait for it to finish and return the logs and exit status.
+        """
+        try:
+            container = await asyncio.to_thread(self.docker_client.containers.get, container_id)
+            # Start the container if it is not running
+            container_status = container.attrs['State']['Status']
+            if container_status != 'running':
+                await asyncio.to_thread(container.start)
+                self.log.info(f"Started container {container_id} (was {container_status})")
+            await asyncio.to_thread(container.wait)
+            logs = await asyncio.to_thread(container.logs)
+            logs = logs.decode('utf-8')
+            exit_code = container.attrs['State']['ExitCode']
+            self.log.info(f"Container logs:\n{logs}")
+            await asyncio.to_thread(container.stop)
+            if exit_code == 0:
+                return {"success": True, "details": "Pipeline ran successfully", "logs": logs}
+            else:
+                return {"success": False, "details": "Pipeline failed", "logs": logs}
+        except Exception as e:
+            self.log.error(f"Failed to run pipeline in container: {e}")
+            return {"success": False, "details": f"Failed to run pipeline in container: {e}"}
