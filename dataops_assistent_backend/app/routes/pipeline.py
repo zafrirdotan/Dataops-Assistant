@@ -19,7 +19,11 @@ async def trigger_pipeline(pipeline_id: str):
     try:
         # You can customize user_input and output_dir as needed
         # pipeline_id = "default pipeline input"
-        result = await dockerize_service.dockerize_pipeline(pipeline_id)
+        pipeline = await pipeline_registry.get_pipeline(pipeline_id)
+        if not pipeline or not pipeline.image_id:
+            raise HTTPException(status_code=404, detail="Pipeline image not found")
+        
+        result = await dockerize_service.run_pipeline_in_container(pipeline.image_id)
         logger.info(f"Pipeline {pipeline_id} triggered successfully.")
         return {"status": "success", "result": result}
     except Exception as e:

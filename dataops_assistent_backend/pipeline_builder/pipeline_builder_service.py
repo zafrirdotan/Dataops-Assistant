@@ -239,6 +239,7 @@ class PipelineBuilderService:
             try:
                 dockerize_result, error = await self._run_step(step_msg, step_number, self.dockerize_service.dockerize_pipeline_v2,
                     pipeline_id,
+                    mode=mode
                 )
                 self.log.info(f"Dockerizeition result:\n{json.dumps(dockerize_result, indent=2)}")
                 if error:
@@ -257,7 +258,8 @@ class PipelineBuilderService:
             if spec.get("schedule") and spec.get("schedule") != "manual":
                 scheduled_result, error = await self._run_step(step_msg, step_number, self.scheduler_service.save_pipeline_to_catalog,
                     pipeline_id,
-                    spec
+                    spec,
+                    mode=mode
                 )
                 if error:
                     self.log.error(f"Failed to schedule the pipeline: {error}")
@@ -268,7 +270,8 @@ class PipelineBuilderService:
             await self.pipeline_registry.update_pipeline(
                 pipeline_id,
                 {
-                    "status": "deployed"
+                    "status": "deployed",
+                    "image_id": dockerize_result.get("image_id")
                 }
             )
 
@@ -278,7 +281,9 @@ class PipelineBuilderService:
                 # Run the pipeline once after deployment
                 self.log.info("Running the pipeline once after deployment...")
                 run_result, error = await self._run_step( step_msg, step_number,
-                    self.dockerize_service.run_pipeline_in_container, dockerize_result.get("image_id"),)
+                    self.dockerize_service.run_pipeline_in_container, dockerize_result.get("image_id"),
+                    mode=mode
+                    )
                 if error:
                     self.log.error(f"Failed to run the pipeline after deployment: {error}")
                 else:

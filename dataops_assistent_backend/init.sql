@@ -16,7 +16,8 @@ CREATE TABLE IF NOT EXISTS dataops_assistent.pipelines (
     updated_at TIMESTAMPTZ,
     status VARCHAR,
     run_list JSON,
-    spec JSON
+    spec JSON,
+    image_id VARCHAR
 );
 
 -- Create tables for storing pipeline executions

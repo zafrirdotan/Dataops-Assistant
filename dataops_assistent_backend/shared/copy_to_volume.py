@@ -58,7 +58,7 @@ def copy_to_volume(volume_name, source_path, dest_path="/dst", helper_image="alp
             helper = start_helper()
         helper.start()
         helper.put_archive(dest_path, tarstream.read())
-        logger.info(f"Copied {source_path} to volume {volume_name}:{dest_path}")
+        logger.debug(f"Copied {source_path} to volume {volume_name}:{dest_path}")
     except Exception as e:
         logger.error(f"Failed to copy to volume: {e}")
         raise

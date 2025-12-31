@@ -68,7 +68,10 @@ class ChatService:
             guardResponse = await self.prompt_guard_service.llm_guard_check(cleaned_input)
         except Exception as e:
             logging.error(f"Error during LLM Guard Check: {e}")
-            return 
+            return {
+                "guard_decision": "block",
+                "error": f"LLM Guard Check failed: {str(e)}"
+            }
         
         logging.info("LLM Guard Response:\n%s", json.dumps(guardResponse, indent=2))
         if not guardResponse.get("is_safe", False):

@@ -19,3 +19,4 @@ class PipelineData(Base):
     status = Column(String, default="draft")
     run_list = Column(JSON, default=list)
     spec = Column(JSON, default=dict)
+    image_id = Column(String, nullable=True)

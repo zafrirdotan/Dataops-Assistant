@@ -18,10 +18,10 @@ async def chat_endpoint(request: ChatRequest):
     """
     result = await chat_service.process_message(request.message)
 
-    if result["decision"] == "block":
+    if result.get("guard_decision") == "block":
         raise HTTPException(status_code=400, detail=result)
 
-    if result["decision"] == "review":
+    if result.get("guard_decision") == "review":
         return result
 
-    return {"response": result["response"]}
+    return {"response": result.get("build_spec", {})}

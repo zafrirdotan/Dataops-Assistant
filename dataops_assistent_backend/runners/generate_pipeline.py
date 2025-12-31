@@ -6,12 +6,16 @@ from shared.models.pipeline_types import PipelineBuildResponse
 
 async def main():
     fast = False
+    run_after_deploy = False
     args = sys.argv[1:]
     if '--fast' in args:
         fast = True
         args.remove('--fast')
+    if '--run-after-deploy' in args:
+        run_after_deploy = True
+        args.remove('--run-after-deploy')
     if len(args) < 1:
-        print("Usage: python generate_pipeline.py 'your message here' [--fast] [--cmd]")
+        print("Usage: python generate_pipeline.py 'your message here' [--fast] [--run-after-deploy] [--cmd]")
         return
     message = args[0]
     chat_service = ChatService()
@@ -22,7 +26,7 @@ async def main():
 ──────────────────────────────────────────────────────────────
           """)
     
-    pipeline_result = await chat_service.process_message(message, fast=fast, mode="cmd", run_after_deploy=True)
+    pipeline_result = await chat_service.process_message(message, fast=fast, mode="cmd", run_after_deploy=run_after_deploy)
     pretty_print_pipeline_result(pipeline_result)
     
 

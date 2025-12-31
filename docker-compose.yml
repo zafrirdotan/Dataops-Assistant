@@ -40,6 +40,7 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./airflow/dags/pipelines/catalog.json:/app/catalog.json
       # Mount local pipeline_builder and shared for live editing
+      - ./dataops_assistent_backend/app:/app/app
       - ./dataops_assistent_backend/pipeline_builder:/app/pipeline_builder
       - ./dataops_assistent_backend/shared:/app/shared
       - ./dataops_assistent_backend/runners:/app/runners
