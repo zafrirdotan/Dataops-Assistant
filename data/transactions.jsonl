@@ -1,15 +1,15 @@
-{"txn_id": "T1000", "customer_id": 18, "transaction_date": "2025-08-07", "amount": 402.82, "currency": "USD"}
-{"txn_id": "T1001", "customer_id": 11, "transaction_date": "2025-10-06", "amount": 385.29, "currency": "USD"}
-{"txn_id": "T1002", "customer_id": 5, "transaction_date": "2025-03-02", "amount": 74.01, "currency": "ILS"}
-{"txn_id": "T1003", "customer_id": 4, "transaction_date": "2025-09-07", "amount": 615.62, "currency": "EUR"}
-{"txn_id": "T1004", "customer_id": 11, "transaction_date": "2024-11-18", "amount": 868.78, "currency": "EUR"}
-{"txn_id": "T1005", "customer_id": 19, "transaction_date": "2025-06-06", "amount": 115.9, "currency": "ILS"}
-{"txn_id": "T1006", "customer_id": 12, "transaction_date": "2025-09-15", "amount": 254.79, "currency": "USD"}
-{"txn_id": "T1007", "customer_id": 19, "transaction_date": "2025-08-22", "amount": 96.93, "currency": "USD"}
-{"txn_id": "T1008", "customer_id": 11, "transaction_date": "2024-11-06", "amount": 506.37, "currency": "EUR"}
-{"txn_id": "T1009", "customer_id": 17, "transaction_date": "2025-02-23", "amount": 345.05, "currency": "USD"}
-{"txn_id": "T1010", "customer_id": 13, "transaction_date": "2024-12-09", "amount": 991.23, "currency": "USD"}
-{"txn_id": "T1011", "customer_id": 20, "transaction_date": "2025-07-24", "amount": 235.4, "currency": "ILS"}
-{"txn_id": "T1012", "customer_id": 1, "transaction_date": "2025-05-11", "amount": 20.01, "currency": "ILS"}
-{"txn_id": "T1013", "customer_id": 13, "transaction_date": "2025-02-16", "amount": 46.88, "currency": "EUR"}
-{"txn_id": "T1014", "customer_id": 2, "transaction_date": "2025-02-17", "amount": 432.88, "currency": "EUR"}
+{"txn_id": "T1000", "customer_id": 18, "transaction_date": "2025-08-07", "amount": 402.82, "currency": "USD", "status": "completed"}
+{"txn_id": "T1001", "customer_id": 11, "transaction_date": "2025-10-06", "amount": 385.29, "currency": "USD", "status": "completed"}
+{"txn_id": "T1002", "customer_id": 5, "transaction_date": "2025-03-02", "amount": 74.01, "currency": "ILS", "status": "completed"}
+{"txn_id": "T1003", "customer_id": 4, "transaction_date": "2025-09-07", "amount": 615.62, "currency": "EUR", "status": "completed"}
+{"txn_id": "T1004", "customer_id": 11, "transaction_date": "2024-11-18", "amount": 868.78, "currency": "EUR", "status": "completed"}
+{"txn_id": "T1005", "customer_id": 19, "transaction_date": "2025-06-06", "amount": 115.9, "currency": "ILS", "status": "completed"}
+{"txn_id": "T1006", "customer_id": 12, "transaction_date": "2025-09-15", "amount": 254.79, "currency": "USD", "status": "completed"}
+{"txn_id": "T1007", "customer_id": 19, "transaction_date": "2025-08-22", "amount": 96.93, "currency": "USD", "status": "completed"}
+{"txn_id": "T1008", "customer_id": 11, "transaction_date": "2024-11-06", "amount": 506.37, "currency": "EUR", "status": "completed"}
+{"txn_id": "T1009", "customer_id": 17, "transaction_date": "2025-02-23", "amount": 345.05, "currency": "USD", "status": "completed"}
+{"txn_id": "T1010", "customer_id": 13, "transaction_date": "2024-12-09", "amount": 991.23, "currency": "USD", "status": "completed"}
+{"txn_id": "T1011", "customer_id": 20, "transaction_date": "2025-07-24", "amount": 235.4, "currency": "ILS", "status": "completed"}
+{"txn_id": "T1012", "customer_id": 1, "transaction_date": "2025-05-11", "amount": 20.01, "currency": "ILS", "status": "completed"}
+{"txn_id": "T1013", "customer_id": 13, "transaction_date": "2025-02-16", "amount": 46.88, "currency": "EUR", "status": "completed"}
+{"txn_id": "T1014", "customer_id": 2, "transaction_date": "2025-02-17", "amount": 432.88, "currency": "EUR", "status": "completed"}
