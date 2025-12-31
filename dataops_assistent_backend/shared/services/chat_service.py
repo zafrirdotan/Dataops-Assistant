@@ -34,10 +34,13 @@ class ChatService:
         if guard_error:
             self.logger.error(f"Error during input guards: {guard_error}")
             return {"guard_decision": "block", "error": str(guard_error)}
-       
+        
+        if guard_result["guard_decision"] == "block":
+            self.logger.warning("Input blocked by guards.")
+            return guard_result
+        
         build_spec = await self.pipeline_builder_service.build_pipeline(guard_result["cleaned_input"], fast=fast, mode=mode, run_after_deploy=run_after_deploy)
                
-
         return {
             "guard_decision": "allow",
             "build_spec": build_spec

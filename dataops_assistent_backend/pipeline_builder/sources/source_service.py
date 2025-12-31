@@ -75,12 +75,17 @@ class SourceService:
                 except Exception as e:
                     return {"failed": False, "details": "Failed to connect to local CSV source."}
             case "localFileJSON":
-                if await self.local_file_service.check_file_exists(spec.get("source_path")):
-                    # TODO: Implement JSON file reading and data preview generation
-                    data_preview = []  # Placeholder until JSON reading is implemented
-                    return {"success": True, "data_preview": data_preview}
-                else:
-                    return {"success": False, "details": "No recent data files found."}
+                try:
+                    data = await self.local_file_service.retrieve_recent_data_files(spec.get("source_path"), date_column="event_date", date_value="2025-09-18", limit=limit)
+                    if data is not None:
+                        raw_preview = data.head().to_dict(orient="records")
+                        # Make JSON serializable
+                        data_preview = make_json_serializable(raw_preview)
+                        return {"success": True, "data_preview": data_preview}
+                    else:
+                        return {"success": False, "details": "No recent data files found."}
+                except Exception as e:
+                    return {"failed": False, "details": "Failed to connect to local JSON source."}
             case "sqlLite":
                 pass
             case "api":
