@@ -1,8 +1,16 @@
 
 import sys
 import asyncio
+import logging
 from shared.services.chat_service import ChatService
 from shared.models.pipeline_types import PipelineBuildResponse
+
+# Configure logging - WARNING level to suppress INFO logs in terminal
+logging.basicConfig(
+    level=logging.WARNING,
+    format='%(asctime)s %(levelname)s %(name)s [%(funcName)s] %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
 
 async def main():
     fast = False
