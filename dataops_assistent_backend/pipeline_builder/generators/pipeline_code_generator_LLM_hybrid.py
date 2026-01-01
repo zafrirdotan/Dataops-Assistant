@@ -53,7 +53,7 @@ class PipelineCodeGeneratorLLMHybrid:
         All test files and outputs should be created and removed automatically by the temporary directory context.
         When testing the output as postgresql, use postgresql to test not sqlite.
         To convert a Python object to a JSON string use json.dumps() always.        
-        For assertions: use == for value comparisons (not 'is'), except None checks. Pandas/numpy types require ==.
+        For assertions: NEVER use 'is' for value comparisons (e.g., 'is True'). Use == instead. DataFrame values are numpy types (np.True_/np.False_), not Python bool. Only use 'is' for None.
         Output code, requirements.txt, and test code only in your response.
         """
 

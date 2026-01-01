@@ -143,6 +143,14 @@
       "tags": [],
       "mode": "full",
       "start_date": "2025-12-24T20:14:57.519143"
+    },
+    {
+      "id": "bank_transactions_ingest_20260101_1001_20260101_100220_1d58e47c",
+      "schedule": "0 2 * * *",
+      "description": "Ingest bank transactions from CSV, transform, and load into Parquet (partitioned by date) and SQLite table orders_daily, running daily at 02:00.",
+      "tags": [],
+      "mode": "full",
+      "start_date": "2026-01-01T10:02:35.856171"
     }
   ]
 }

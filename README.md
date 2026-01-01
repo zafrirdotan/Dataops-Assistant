@@ -34,6 +34,8 @@ DataOps Assistant bridges the gap between data engineering and MLOps by providin
 
 ### Quick Start
 
+**Prerequisites:** Docker and Docker Compose installed on your system.
+
 1. **Clone the project**
 
    ```bash
@@ -43,26 +45,37 @@ DataOps Assistant bridges the gap between data engineering and MLOps by providin
 
 2. **Run setup script**
 
-   ```
-    bash setup.sh
+   ```bash
+   bash setup.sh
    ```
 
-3. **Build and run Airflow compose**
+3. **Configure environment variables**
+
+   - Copy `.env.example` to `.env`:
+     ```bash
+     cp .env.example .env
+     ```
+   - Update the OpenAI API key in `.env`
+   - Update the absolute paths for input and output volumes
+
+4. **Build and run Airflow compose**
 
    ```bash
    docker compose -f docker-compose.airflow.yml up -d --build
    ```
 
-4. **Update .env**
-
-   - Open the `.env` file in the root folder of the project as shown in `.env.example`.
-   - Update the OpenAI API key.
-   - Update the absolute paths for input and output volumes.
-
 5. **Build and run main compose**
    ```bash
    docker compose -f docker-compose.yml up -d --build
    ```
+
+### Access Services
+
+Once all services are running, you can access:
+
+- **API:** http://localhost:8080
+- **MinIO Console:** http://localhost:9001 (username: `minioadmin`, password: `minioadmin`)
+- **Airflow:** http://localhost:8082
 
 ### Database Checks
 
@@ -97,5 +110,5 @@ _At this point, it is the same DB for input, output, and the system DB._
 
 - Parquet and SQLite files will be located in the output folder after a manual or scheduled run.
 - PostgreSQL data will be in DB in port 5432
-- Full python code for the pipelines will be in minio http://localhost:9001/ username:minioadmin password:minioadmin
-- Airflow schedules can be found on http://localhost:8082/dags and in airflow/dags/pipelines/catalog.json
+- Pipelines including full Python code can be found locally in `pipelines/` directory or in MinIO at http://localhost:9001 (username: `minioadmin`, password: `minioadmin`)
+- Airflow schedules can be found at http://localhost:8082/dags and in `airflow/dags/pipelines/catalog.json`
