@@ -6,6 +6,12 @@
 
 DataOps Assistant is an intelligent co-pilot platform for automating, orchestrating, and managing ETL (Extract, Transform, Load) pipelines. It leverages LLM-powered code generation and validation to streamline the creation, testing, and scheduling of ETL pipelines, making modern data operations accessible and efficient for both data engineers and analysts.
 
+### 🎥 Demo
+
+https://github.com/user-attachments/assets/5be8d792-2363-4281-9836-bcb4c059afcb
+
+**Watch a complete walkthrough of creating and deploying an ETL pipeline with DataOps Assistant**
+
 ### Main Capabilities
 
 - **Automated Pipeline Generation:** Generate ETL pipeline code and SQL queries from natural language specifications using LLMs.
