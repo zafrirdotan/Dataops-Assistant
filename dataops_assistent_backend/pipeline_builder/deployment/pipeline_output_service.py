@@ -109,7 +109,7 @@ class PipelineOutputService:
         except Exception as e:
             self.log.error(f"Failed to read Dockerfile template: {e}")
 
-    def get_pipeline_files(self, pipeline_id: str) -> Dict[str, str]:
+    async def get_pipeline_files(self, pipeline_id: str) -> Dict[str, str]:
         """
         Retrieves the pipeline files from MinIO storage.
 
@@ -119,7 +119,7 @@ class PipelineOutputService:
             Dict[str, str]: Dictionary containing the content of the pipeline files
         """
         try:
-            stored_files = self.storage_service.retrieve_pipeline(pipeline_id)
+            stored_files = await self.storage_service.retrieve_pipeline(pipeline_id)
             if not stored_files:
                 self.log.error(f"No files found for pipeline ID: {pipeline_id}")
                 return {}
