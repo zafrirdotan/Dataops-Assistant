@@ -14,7 +14,7 @@ async def main():
     step_msg = "Step 6: Running pipeline tests from MinIO storage..."
     step_number = 6
     test_result, error = await run_step_with_spinner(step_msg, step_number, test_service.run_pipeline_test_in_venv_v2,
-        "bank_transactions_to_parquet_and_sqlite_20251228_1320_20251228_132029_1920b598"
+        "mock_etl_pipeline_20260127_083830_8c9f66b4"
     )
     print(step_msg)
     print("Test result:", json.dumps(test_result))
