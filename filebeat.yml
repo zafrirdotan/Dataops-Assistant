@@ -13,14 +13,15 @@ filebeat.inputs:
           when:
             has_fields: ["message"]
 
-      - drop_event:
-          when:
-            not:
-              or:
-                - contains:
-                    container.name: "dataops-assistant"
-                - contains:
-                    container.name: "airflow"
+      # Removed filter to capture all container logs
+      # - drop_event:
+      #     when:
+      #       not:
+      #         or:
+      #           - contains:
+      #               container.name: "dataops-assistant"
+      #           - contains:
+      #               container.name: "airflow"
 
 output.elasticsearch:
   hosts: ["http://elasticsearch:9200"]
