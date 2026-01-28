@@ -1,5 +1,8 @@
 # .gitignore for dataops_assistent_backend project
 .env
+.env.prod
+.env.dev
+.env.local
 __pycache__/
 *.pyc
 # VS Code settings

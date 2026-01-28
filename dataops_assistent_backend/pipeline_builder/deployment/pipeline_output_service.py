@@ -5,20 +5,22 @@ import datetime
 import uuid
 import json
 from typing import Dict, Any
-from shared.services.local_storage_service import LocalStorageService
-from shared.services.storage_service import MinioStorage
+from shared.services.storage_factory import get_storage_service
 from ..types import CodeGenResult
+
 
 class PipelineOutputService:
     """
     Service responsible for creating and managing pipeline output files.
-    Now stores files directly in MinIO instead of local filesystem.
+    Storage location depends on ENVIRONMENT variable:
+    - prod/production: AWS S3
+    - dev/development: MinIO
+    - local-debug/local: Local filesystem
     """
 
     def __init__(self):
         self.log = logging.getLogger("dataops")
-        self.storage_service = MinioStorage()
-        self.local_storage_service = LocalStorageService()
+        self.storage_service = get_storage_service()
         # Keep template dir for backward compatibility
         self.template_dir = os.path.dirname(__file__)
         self.env_template_path = os.path.join(self.template_dir, ".env.template")
@@ -26,17 +28,15 @@ class PipelineOutputService:
 
     async def store_pipeline_files(self, pipeline_name: str, code: CodeGenResult) -> Dict[str, Any]:
         """
-        Creates pipeline files and stores them directly in MinIO instead of local filesystem.
+        Creates pipeline files and stores them using the configured storage service.
+        Storage location is determined by ENVIRONMENT variable.
 
         Args:
             pipeline_name: Name of the pipeline
             code: Python code for the pipeline
-            requirements: Requirements.txt content
-            python_test: Test code for the pipeline
-            output_dir: Base directory (ignored, kept for compatibility)
 
         Returns:
-            Dict[str, Any]: Pipeline metadata including MinIO storage locations
+            Dict[str, Any]: Pipeline metadata including storage locations
         """
         try:
             # Generate unique pipeline ID
@@ -63,24 +63,25 @@ class PipelineOutputService:
                 "dockerfile": self.get_dockerfile_as_string(),
             }
 
-            # Store pipeline directly in MinIO
-            self.log.info(f"Storing pipeline {pipeline_id} in MinIO...")
+            # Store pipeline using configured storage service
+            storage_type = type(self.storage_service).__name__
+            self.log.info(f"Storing pipeline {pipeline_id} using {storage_type}...")
             stored_files = await self.storage_service.store_pipeline(pipeline_id, pipeline_data)
 
-            self.log.info(f"Pipeline {pipeline_id} stored successfully in MinIO")
+            self.log.info(f"Pipeline {pipeline_id} stored successfully using {storage_type}")
 
-            # Return pipeline metadata (compatible with old interface)
+            # Return pipeline metadata
             return {
                 "success": True,
                 "pipeline_id": pipeline_id,
-                "storage_location": "MinIO",
+                "storage_type": storage_type,
                 "stored_files": stored_files,
-                "folder": f"minio://pipelines/{pipeline_id}",  # Virtual folder path for compatibility
+                "folder": f"pipelines/{pipeline_id}",
                 "timestamp": timestamp
             }
 
         except Exception as e:
-            self.log.error(f"Failed to create pipeline files in MinIO: {e}")
+            self.log.error(f"Failed to create pipeline files: {e}")
             raise Exception(f"Pipeline file creation failed: {e}")
 
     def get_env_as_string(self) -> str:
@@ -111,7 +112,7 @@ class PipelineOutputService:
 
     async def get_pipeline_files(self, pipeline_id: str) -> Dict[str, str]:
         """
-        Retrieves the pipeline files from MinIO storage.
+        Retrieves the pipeline files from configured storage service.
 
         Args:
             pipeline_id: Unique ID of the pipeline
@@ -125,5 +126,5 @@ class PipelineOutputService:
                 return {}
             return stored_files
         except Exception as e:
-            self.log.error(f"Failed to retrieve pipeline files from MinIO: {e}")
+            self.log.error(f"Failed to retrieve pipeline files: {e}")
             return {}

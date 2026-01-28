@@ -12,6 +12,8 @@ services:
       - .env
     environment:
       - DATA_FOLDER=/app/data
+      # Environment Configuration
+      - ENVIRONMENT=${ENVIRONMENT:-dev}
       # Database Configuration
       - DATABASE_URL=postgresql://dataops_user:dataops_password@postgres:5432/dataops_db
       - POSTGRES_DB=dataops_db
