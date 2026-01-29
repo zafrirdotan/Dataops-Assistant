@@ -36,13 +36,13 @@ class ChatService:
         if guard_error:
             self.logger.error(f"Error during input guards: {guard_error}")
             return {"guard_decision": "block", "error": str(guard_error)}
-        
+
         if guard_result["guard_decision"] == "block":
             self.logger.warning("Input blocked by guards.")
             return guard_result
-        
+
         build_spec = await self.pipeline_builder_service.build_pipeline(guard_result["cleaned_input"], fast=fast, mode=mode, run_after_deploy=run_after_deploy)
-               
+
         return {
             "guard_decision": "allow",
             "build_spec": build_spec
@@ -208,14 +208,14 @@ class ChatService:
         analysis = self.prompt_guard_service.analyze(raw_message)
         logging.info(f"Prompt Guard Analysis: {analysis}")
         if analysis["decision"] == "block":
-            logging.warning(f"Input blocked: {analysis['findings']}")   
+            logging.warning(f"Input blocked: {analysis['findings']}")
             return {
                 "guard_decision": "block",
                 "error": "Input blocked due to security concerns.",
                 "findings": analysis["findings"]
             }
-            
-        cleaned_input = analysis["cleaned"]   
+
+        cleaned_input = analysis["cleaned"]
         # Step 2: Perform LLM Guard Check
         try:
             guardResponse = await self.prompt_guard_service.llm_guard_check(cleaned_input)
@@ -225,7 +225,7 @@ class ChatService:
                 "guard_decision": "block",
                 "error": f"LLM Guard Check failed: {str(e)}"
             }
-        
+
         logging.info("LLM Guard Response:\n%s", json.dumps(guardResponse, indent=2))
         if not guardResponse.get("is_safe", False):
             return {

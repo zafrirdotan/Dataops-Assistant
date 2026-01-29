@@ -37,7 +37,7 @@ class LLMService:
                         input=input,
                         temperature=0,
                         text=text)
-                
+
                 return response
             except Exception as e:
                 return f"OpenAI API error: {e}"
@@ -86,5 +86,3 @@ class LLMService:
 
         except Exception as e:
             yield f"LLM stream error: {e}"
-    
-
