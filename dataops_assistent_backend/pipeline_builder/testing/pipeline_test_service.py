@@ -20,9 +20,6 @@ class PipelineTestService:
         self.output_service = PipelineOutputService()
         self.env_test_template_path = os.path.join(os.path.dirname(__file__), ".env.test_template")
 
-
-
-
     async def run_pipeline_test_in_venv_v2(self, pipeline_id: str) -> dict:
         """
         Run the pipeline test in a single shared virtual environment for all pipelines.
@@ -144,8 +141,6 @@ class PipelineTestService:
         }
 
         for key, value in credentials.items():
-            print(f"Adding S3 credential to env: {key}={value}")
             env_test_content += f"\n{key}={value}"
 
-        print("Final ENV TEST CONTENT with S3 Credentials:", env_test_content)
         return env_test_content

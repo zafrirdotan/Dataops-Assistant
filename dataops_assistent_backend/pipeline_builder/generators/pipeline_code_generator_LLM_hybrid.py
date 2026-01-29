@@ -160,14 +160,14 @@ class PipelineCodeGeneratorLLMHybrid:
             parquet_spec = (
                 "The destination is Parquet files. "
                 "Upload the output to S3 using boto3. "
-                "S3 credentials are in environment variables: S3_BUCKET, S3_REGION, S3_ACCESS_KEY, S3_SECRET_KEY (with AWS_* fallbacks if present). "
-                "The S3 key should be: pipeline_id/output.parquet"
+                "S3 credentials are in environment variables: S3_BUCKET, S3_REGION, S3_ACCESS_KEY, S3_SECRET_KEY. "
+                "The S3 key should be: pipeline-outputs/pipeline_id/output.parquet"
             )
             sqlite_spec = (
                 "The destination is a SQLite file. "
                 "Create the SQLite file in a temporary location, then upload to S3 using boto3. "
-                "S3 credentials are in environment variables: S3_BUCKET, S3_REGION, S3_ACCESS_KEY, S3_SECRET_KEY (with AWS_* fallbacks if present). "
-                "The S3 key should be: pipeline_id/table_name.sqlite"
+                "S3 credentials are in environment variables: S3_BUCKET, S3_REGION, S3_ACCESS_KEY, S3_SECRET_KEY. "
+                "The S3 key should be: pipeline-outputs/pipeline_id/table_name.sqlite"
             )
         else:
             parquet_spec = (
@@ -384,8 +384,8 @@ def load_data(data):
         # S3 configuration
         s3_bucket = os.getenv('S3_BUCKET')
         s3_region = os.getenv('S3_REGION', os.getenv('AWS_REGION', 'us-east-1'))
-        aws_access_key = os.getenv('S3_ACCESS_KEY') or os.getenv('AWS_ACCESS_KEY')
-        aws_secret_key = os.getenv('S3_SECRET_KEY') or os.getenv('AWS_SECRET_KEY')
+        aws_access_key = os.getenv('S3_ACCESS_KEY')
+        aws_secret_key = os.getenv('S3_SECRET_KEY')
         s3_endpoint = os.getenv('S3_ENDPOINT')
         s3_use_path_style = os.getenv('S3_USE_PATH_STYLE', 'false').lower() == 'true'
 
@@ -404,7 +404,7 @@ def load_data(data):
             tmp_path = tmp_file.name
             data.to_parquet(tmp_path, index=False)
 
-            s3_key = f"{pipeline_id}/output.parquet"
+            s3_key = f"pipeline-outputs/{pipeline_id}/output.parquet"
             s3_client.upload_file(tmp_path, s3_bucket, s3_key)
             logging.info(f"Data loaded to S3: s3://{s3_bucket}/{s3_key}")
             os.unlink(tmp_path)
@@ -448,8 +448,8 @@ def load_data(data):
         # S3 configuration
         s3_bucket = os.getenv('S3_BUCKET')
         s3_region = os.getenv('S3_REGION', os.getenv('AWS_REGION', 'us-east-1'))
-        aws_access_key = os.getenv('S3_ACCESS_KEY') or os.getenv('S3_ACCESS_KEY')
-        aws_secret_key = os.getenv('S3_SECRET_KEY') or os.getenv('S3_SECRET_KEY')
+        aws_access_key = os.getenv('S3_ACCESS_KEY')
+        aws_secret_key = os.getenv('S3_SECRET_KEY')
         s3_endpoint = os.getenv('S3_ENDPOINT')
         s3_use_path_style = os.getenv('S3_USE_PATH_STYLE', 'false').lower() == 'true'
 
@@ -470,7 +470,7 @@ def load_data(data):
             data.to_sql(table_name, con=engine, if_exists='replace', index=False)
             engine.dispose()
 
-            s3_key = f"{pipeline_id}/{table_name}.sqlite"
+            s3_key = f"pipeline-outputs/{pipeline_id}/{table_name}.sqlite"
             s3_client.upload_file(db_path, s3_bucket, s3_key)
             logging.info(f"Data loaded to S3: s3://{s3_bucket}/{s3_key}")
             os.unlink(db_path)
