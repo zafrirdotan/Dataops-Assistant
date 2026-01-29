@@ -81,7 +81,7 @@ DataOps Assistant bridges the gap between data engineering and MLOps by providin
    # Production mode (AWS S3)
    make up-prod
    # or
-    docke
+   docker-compose --env-file .env.prod up -d
 
    # Local debug mode (filesystem)
    make up-local-debug
