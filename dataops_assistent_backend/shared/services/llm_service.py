@@ -3,7 +3,7 @@
 Service for handling calls to OpenAI or other LLM providers.
 """
 
-from typing import Optional
+from typing import Optional, AsyncGenerator
 import os
 from xml.parsers.expat import model
 import openai
@@ -41,5 +41,50 @@ class LLMService:
                 return response
             except Exception as e:
                 return f"OpenAI API error: {e}"
+
+
+    async def stream_response(self, input, text=None) -> AsyncGenerator[str, None]:
+        """
+        Stream response text deltas from the LLM provider.
+        Yields text chunks as they arrive.
+        """
+        if self.provider != "openai" or not self.api_key or not self.async_client:
+            yield "LLM is not configured."
+            return
+
+        try:
+            responses_api = getattr(self.async_client, "responses", None)
+            if responses_api and hasattr(responses_api, "stream"):
+                async with responses_api.stream(
+                    model="gpt-4.1",
+                    input=input,
+                    temperature=0,
+                    text=text,
+                ) as stream:
+                    async for event in stream:
+                        event_type = getattr(event, "type", None)
+                        if event_type is None and isinstance(event, dict):
+                            event_type = event.get("type")
+                        if event_type == "response.output_text.delta":
+                            delta = getattr(event, "delta", None)
+                            if delta is None and isinstance(event, dict):
+                                delta = event.get("delta")
+                            if delta:
+                                yield delta
+                return
+
+            response = await self.response_create_async(input=input, text=text)
+            if isinstance(response, str):
+                yield response
+                return
+
+            output_text = getattr(response, "output_text", None)
+            if output_text is None and isinstance(response, dict):
+                output_text = response.get("output_text")
+            if output_text:
+                yield output_text
+
+        except Exception as e:
+            yield f"LLM stream error: {e}"
     
 

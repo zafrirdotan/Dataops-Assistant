@@ -1,5 +1,7 @@
 import json
 import logging
+import asyncio
+from typing import AsyncGenerator
 
 from shared.services.llm_service import LLMService
 from pipeline_builder.guards.prompt_guard_service import PromptGuardService
@@ -44,6 +46,157 @@ class ChatService:
         return {
             "guard_decision": "allow",
             "build_spec": build_spec
+        }
+
+    async def process_message_stream(self, raw_message: str, fast: bool = False, run_after_deploy: bool = False) -> AsyncGenerator[dict, None]:
+        """
+        Stream processing events for the user message and pipeline build steps.
+        """
+        yield {
+            "event": "step",
+            "data": {
+                "step": "validate_request",
+                "step_number": 0,
+                "message": "Validating request...",
+                "status": "started"
+            }
+        }
+
+        guard_result, guard_error = await self._run_step(
+            "Validating request...",
+            0,
+            self.run_guards_on_input,
+            raw_message,
+            mode="chat"
+        )
+
+        if guard_error:
+            self.logger.error(f"Error during input guards: {guard_error}")
+            yield {
+                "event": "step",
+                "data": {
+                    "step": "validate_request",
+                    "step_number": 0,
+                    "message": "Validating request...",
+                    "status": "error",
+                    "error": str(guard_error)
+                }
+            }
+            yield {"event": "final", "data": {"success": False, "error": str(guard_error)}}
+            return
+
+        if guard_result["guard_decision"] == "block":
+            self.logger.warning("Input blocked by guards.")
+            yield {
+                "event": "step",
+                "data": {
+                    "step": "validate_request",
+                    "step_number": 0,
+                    "message": "Validating request...",
+                    "status": "completed"
+                }
+            }
+            yield {"event": "guard", "data": guard_result}
+            yield {"event": "final", "data": {"success": False, "guard": guard_result}}
+            return
+
+        yield {
+            "event": "step",
+            "data": {
+                "step": "validate_request",
+                "step_number": 0,
+                "message": "Validating request...",
+                "status": "completed"
+            }
+        }
+
+        if getattr(self.llm_service, "async_client", None):
+            yield {
+                "event": "step",
+                "data": {
+                    "step": "assistant_guidance",
+                    "step_number": 0,
+                    "message": "Generating guidance and questions...",
+                    "status": "started"
+                }
+            }
+
+            guidance_prompt = (
+                "You are a data engineering assistant. "
+                "Given the user request, provide a short guidance on how to frame an ETL request, "
+                "and ask up to 5 clarifying questions only if needed. "
+                "Keep it concise.\n\n"
+                f"User request: {raw_message}"
+            )
+
+            async for delta in self.llm_service.stream_response(guidance_prompt):
+                yield {"event": "llm", "data": {"phase": "guidance", "delta": delta}}
+
+            yield {
+                "event": "step",
+                "data": {
+                    "step": "assistant_guidance",
+                    "step_number": 0,
+                    "message": "Generating guidance and questions...",
+                    "status": "completed"
+                }
+            }
+        else:
+            yield {
+                "event": "step",
+                "data": {
+                    "step": "assistant_guidance",
+                    "step_number": 0,
+                    "message": "Generating guidance and questions...",
+                    "status": "skipped",
+                    "reason": "LLM not configured"
+                }
+            }
+
+        queue: asyncio.Queue = asyncio.Queue()
+
+        async def on_event(payload: dict):
+            await queue.put(payload)
+
+        build_task = asyncio.create_task(
+            self.pipeline_builder_service.build_pipeline(
+                guard_result["cleaned_input"],
+                fast=fast,
+                mode="chat",
+                run_after_deploy=run_after_deploy,
+                event_callback=on_event
+            )
+        )
+
+        while True:
+            if build_task.done() and queue.empty():
+                break
+            try:
+                event = await asyncio.wait_for(queue.get(), timeout=0.2)
+                yield event
+            except asyncio.TimeoutError:
+                continue
+
+        build_spec = await build_task
+        if build_spec.get("error") or build_spec.get("success") is False:
+            yield {
+                "event": "final",
+                "data": {
+                    "success": False,
+                    "error": build_spec.get("error") or build_spec.get("details"),
+                    "build_spec": build_spec
+                }
+            }
+            return
+
+        yield {
+            "event": "final",
+            "data": {
+                "success": True,
+                "pipeline_id": build_spec.get("pipeline_id"),
+                "pipeline_code": build_spec.get("pipeline_code"),
+                "build_spec": build_spec
+            }
         }
 
 
