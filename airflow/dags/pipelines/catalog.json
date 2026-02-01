@@ -151,6 +151,22 @@
       "tags": [],
       "mode": "full",
       "start_date": "2026-01-01T10:02:35.856171"
+    },
+    {
+      "id": "ingest_orders_daily_20260129_2337_20260129_233816_9b16b103",
+      "schedule": "0 2 * * *",
+      "description": "Ingest CSV files from ./data/ to both Parquet (partitioned by date) and SQLite table orders_daily, running daily at 02:00.",
+      "tags": [],
+      "mode": "full",
+      "start_date": "2026-01-29T23:38:31.261388"
+    },
+    {
+      "id": "csv_to_parquet_and_sqlite_orders_daily_20260129_2343_20260129_234414_4a4ac9ee",
+      "schedule": "0 2 * * *",
+      "description": "Ingest all CSV files from ./data/ to Parquet (partitioned by date) and to SQLite table orders_daily, running daily at 02:00.",
+      "tags": [],
+      "mode": "full",
+      "start_date": "2026-01-29T23:44:29.736553"
     }
   ]
 }
