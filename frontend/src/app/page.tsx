@@ -1,19 +1,18 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { PipelineNav } from "@/components/pipeline-nav";
 import { AppHeader } from "@/components/app-header";
 import { PipelineSteps } from "@/components/pipeline-steps";
 import { PipelineCode } from "@/components/pipeline-code";
+import { ChatInput } from "@/components/chat-input";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
 
 type ChatMessage = {
-  role: "user" | "assistant" | "system";
+  role: "user" | "assistant" | "system" | "steps" | "code";
   content: string;
 };
 
@@ -198,6 +197,8 @@ export default function Home() {
     (message) => message.role === "assistant",
   );
   const showSteps = steps.length > 0;
+  const hasStepInProgress = steps.some((step) => step.status === "started");
+  const disableSend = isLoading || hasStepInProgress;
 
   return (
     <div className="h-screen overflow-hidden bg-white text-black">
@@ -217,18 +218,12 @@ export default function Home() {
                     <h2 className="mb-3 text-center text-3xl font-semibold py-10">
                       Describe the pipeline
                     </h2>
-                    <div className="mt-4 flex gap-3 border border-black/30 px-4 py-4 rounded-md">
-                      <Textarea
-                        placeholder="Describe the pipeline"
-                        value={input}
-                        onChange={(e) => setInput(e.target.value)}
-                        rows={4}
-                        className="border-0 resize-none shadow-none outline-none focus-visible:ring-0 focus-visible:ring-offset-0"
-                      />
-                      <div className="flex items-center justify-between">
-                        <Button onClick={handleSubmit}>Send</Button>
-                      </div>
-                    </div>
+                    <ChatInput
+                      value={input}
+                      onChange={setInput}
+                      onSubmit={handleSubmit}
+                      disabled={disableSend}
+                    />
                   </div>
                 </div>
               ) : (
@@ -236,45 +231,82 @@ export default function Home() {
                   <div className="flex flex-1 flex-col min-h-0 overflow-hidden">
                     <ScrollArea className="flex-1 min-h-0 rounded-md border border-black/10 bg-white p-4">
                       <div className="flex flex-col gap-4">
-                        {messages.map((message, idx) => (
-                          <div
-                            key={`${message.role}-${idx}`}
-                            className={`flex ${
-                              message.role === "user"
-                                ? "justify-end"
-                                : "justify-start"
-                            }`}
-                          >
-                            <div
-                              className={`max-w-[85%] rounded-lg px-4 py-2 text-sm leading-6 ${
-                                message.role === "user"
-                                  ? "bg-black text-white"
-                                  : message.role === "system"
-                                    ? "border border-black bg-white text-black"
-                                    : "bg-zinc-100 text-black"
-                              }`}
-                            >
-                              <ReactMarkdown
-                                remarkPlugins={[remarkGfm]}
-                                rehypePlugins={[rehypeHighlight]}
-                                components={{
-                                  pre: ({ children }) => (
-                                    <pre className="overflow-auto rounded-md bg-zinc-900 p-3 text-zinc-100">
-                                      {children}
-                                    </pre>
-                                  ),
-                                  code: ({ className, children }) => (
-                                    <code className={className ?? ""}>
-                                      {children}
-                                    </code>
-                                  ),
-                                }}
+                        {messages.map((message, idx) => {
+                          if (
+                            message.role === "user" ||
+                            message.role === "assistant" ||
+                            message.role === "system"
+                          ) {
+                            return (
+                              <div
+                                key={`${message.role}-${idx}`}
+                                className={`flex ${
+                                  message.role === "user"
+                                    ? "justify-end"
+                                    : "justify-start"
+                                }`}
                               >
-                                {message.content}
-                              </ReactMarkdown>
-                            </div>
-                          </div>
-                        ))}
+                                <div
+                                  className={`max-w-[85%] rounded-lg px-4 py-2 text-sm leading-6 ${
+                                    message.role === "user"
+                                      ? "bg-black text-white"
+                                      : message.role === "system"
+                                        ? "border border-black bg-white text-black"
+                                        : "bg-zinc-100 text-black"
+                                  }`}
+                                >
+                                  <ReactMarkdown
+                                    remarkPlugins={[remarkGfm]}
+                                    rehypePlugins={[rehypeHighlight]}
+                                    components={{
+                                      pre: ({ children }) => (
+                                        <pre className="overflow-auto rounded-md bg-zinc-900 p-3 text-zinc-100">
+                                          {children}
+                                        </pre>
+                                      ),
+                                      code: ({ className, children }) => (
+                                        <code className={className ?? ""}>
+                                          {children}
+                                        </code>
+                                      ),
+                                    }}
+                                  >
+                                    {message.content}
+                                  </ReactMarkdown>
+                                </div>
+                              </div>
+                            );
+                          } else if (
+                            message.role === "steps" ||
+                            message.role === "code"
+                          ) {
+                            return (
+                              <div className="flex justify-start">
+                                <div className="flex w-full flex-wrap gap-4">
+                                  {showSteps && (
+                                    <div className="w-[300px] rounded-lg border border-black/10 bg-white px-4 py-3">
+                                      <div className="text-xs font-semibold text-zinc-500">
+                                        Pipeline steps
+                                      </div>
+                                      <div className="mt-3">
+                                        <PipelineSteps
+                                          steps={steps}
+                                          statusClass={statusClass}
+                                        />
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {pipelineCode && (
+                                    <div className="min-w-[280px] flex-1">
+                                      <PipelineCode code={pipelineCode} />
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          }
+                        })}
 
                         {isLoading && !hasAssistantMessage && (
                           <div className="flex justify-start">
@@ -321,22 +353,14 @@ export default function Home() {
                     </ScrollArea>
 
                     <div className="sticky bottom-0 border-t border-black/10 bg-white px-4 py-4">
-                      <div className="flex flex-col gap-3">
-                        <Textarea
-                          placeholder="Describe the pipeline"
-                          value={input}
-                          onChange={(e) => setInput(e.target.value)}
-                          rows={3}
-                        />
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs text-zinc-500">
-                            {isLoading ? "Streaming..." : "Ready"}
-                          </span>
-                          <Button onClick={handleSubmit} disabled={isLoading}>
-                            Send
-                          </Button>
-                        </div>
-                      </div>
+                      <ChatInput
+                        value={input}
+                        onChange={setInput}
+                        onSubmit={handleSubmit}
+                        disabled={disableSend}
+                        showStatus
+                        statusText={isLoading ? "Streaming..." : "Ready"}
+                      />
                     </div>
                   </div>
                 </>

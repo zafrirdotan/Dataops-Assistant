@@ -111,16 +111,6 @@ class ChatService:
         }
 
         if getattr(self.llm_service, "async_client", None):
-            yield {
-                "event": "step",
-                "data": {
-                    "step": "assistant_guidance",
-                    "step_number": 0,
-                    "message": "Generating guidance and questions...",
-                    "status": "started"
-                }
-            }
-
             guidance_prompt = (
                 "You are a data engineering assistant. "
                 "Given the user request, provide a short guidance on how to frame an ETL request, "
@@ -131,27 +121,8 @@ class ChatService:
 
             async for delta in self.llm_service.stream_response(guidance_prompt):
                 yield {"event": "llm", "data": {"phase": "guidance", "delta": delta}}
-
-            yield {
-                "event": "step",
-                "data": {
-                    "step": "assistant_guidance",
-                    "step_number": 0,
-                    "message": "Generating guidance and questions...",
-                    "status": "completed"
-                }
-            }
         else:
-            yield {
-                "event": "step",
-                "data": {
-                    "step": "assistant_guidance",
-                    "step_number": 0,
-                    "message": "Generating guidance and questions...",
-                    "status": "skipped",
-                    "reason": "LLM not configured"
-                }
-            }
+            pass
 
         queue: asyncio.Queue = asyncio.Queue()
 
