@@ -8,6 +8,9 @@ import { PipelineNav } from "@/components/pipeline-nav";
 import { AppHeader } from "@/components/app-header";
 import { PipelineSteps } from "@/components/pipeline-steps";
 import { PipelineCode } from "@/components/pipeline-code";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import rehypeHighlight from "rehype-highlight";
 
 type ChatMessage = {
   role: "user" | "assistant" | "system";
@@ -197,17 +200,17 @@ export default function Home() {
   const showSteps = steps.length > 0;
 
   return (
-    <div className="min-h-screen bg-white text-black">
-      <div className="mx-auto flex min-h-screen w-full">
+    <div className="h-screen overflow-hidden bg-white text-black">
+      <div className="mx-auto flex h-screen w-full overflow-hidden">
         <aside className="hidden w-72 lg:flex lg:sticky lg:self-start lg:h-[calc(100vh-4rem)]">
           <PipelineNav />
         </aside>
 
-        <main className="flex flex-1 flex-col gap-6">
+        <main className="flex flex-1 flex-col gap-6 min-h-0 overflow-hidden">
           <AppHeader />
 
-          <div className="flex flex-1 items-stretch justify-center">
-            <div className="flex w-full flex-col gap-4">
+          <div className="flex flex-1 items-stretch justify-center min-h-0 overflow-hidden">
+            <div className="flex w-full flex-col gap-4 min-h-0 overflow-hidden">
               {messages.length === 0 && !isLoading ? (
                 <div className="flex flex-1 items-center justify-center w-1/2 mx-auto -mt-50">
                   <div className="w-full">
@@ -230,90 +233,109 @@ export default function Home() {
                 </div>
               ) : (
                 <>
-                  <ScrollArea className="flex-1 min-h-[360px] rounded-md border border-black/10 bg-white p-4">
-                    <div className="flex flex-col gap-4">
-                      {messages.map((message, idx) => (
-                        <div
-                          key={`${message.role}-${idx}`}
-                          className={`flex ${
-                            message.role === "user"
-                              ? "justify-end"
-                              : "justify-start"
-                          }`}
-                        >
+                  <div className="flex flex-1 flex-col min-h-0 overflow-hidden">
+                    <ScrollArea className="flex-1 min-h-0 rounded-md border border-black/10 bg-white p-4">
+                      <div className="flex flex-col gap-4">
+                        {messages.map((message, idx) => (
                           <div
-                            className={`max-w-[85%] rounded-lg px-4 py-2 text-sm leading-6 ${
+                            key={`${message.role}-${idx}`}
+                            className={`flex ${
                               message.role === "user"
-                                ? "bg-black text-white"
-                                : message.role === "system"
-                                  ? "border border-black bg-white text-black"
-                                  : "bg-zinc-100 text-black"
+                                ? "justify-end"
+                                : "justify-start"
                             }`}
                           >
-                            {message.content}
+                            <div
+                              className={`max-w-[85%] rounded-lg px-4 py-2 text-sm leading-6 ${
+                                message.role === "user"
+                                  ? "bg-black text-white"
+                                  : message.role === "system"
+                                    ? "border border-black bg-white text-black"
+                                    : "bg-zinc-100 text-black"
+                              }`}
+                            >
+                              <ReactMarkdown
+                                remarkPlugins={[remarkGfm]}
+                                rehypePlugins={[rehypeHighlight]}
+                                components={{
+                                  pre: ({ children }) => (
+                                    <pre className="overflow-auto rounded-md bg-zinc-900 p-3 text-zinc-100">
+                                      {children}
+                                    </pre>
+                                  ),
+                                  code: ({ className, children }) => (
+                                    <code className={className ?? ""}>
+                                      {children}
+                                    </code>
+                                  ),
+                                }}
+                              >
+                                {message.content}
+                              </ReactMarkdown>
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        ))}
 
-                      {isLoading && !hasAssistantMessage && (
-                        <div className="flex justify-start">
-                          <div className="max-w-[85%] rounded-lg bg-zinc-100 px-4 py-2 text-sm text-black">
-                            Starting work...
+                        {isLoading && !hasAssistantMessage && (
+                          <div className="flex justify-start">
+                            <div className="max-w-[85%] rounded-lg bg-zinc-100 px-4 py-2 text-sm text-black">
+                              Starting work...
+                            </div>
                           </div>
-                        </div>
-                      )}
+                        )}
 
-                      {(showSteps || pipelineCode) && (
-                        <div className="flex justify-start">
-                          <div className="flex w-full flex-wrap gap-4">
-                            {showSteps && (
-                              <div className="w-[300px] rounded-lg border border-black/10 bg-white px-4 py-3">
-                                <div className="text-xs font-semibold text-zinc-500">
-                                  Pipeline steps
+                        {(showSteps || pipelineCode) && (
+                          <div className="flex justify-start">
+                            <div className="flex w-full flex-wrap gap-4">
+                              {showSteps && (
+                                <div className="w-[300px] rounded-lg border border-black/10 bg-white px-4 py-3">
+                                  <div className="text-xs font-semibold text-zinc-500">
+                                    Pipeline steps
+                                  </div>
+                                  <div className="mt-3">
+                                    <PipelineSteps
+                                      steps={steps}
+                                      statusClass={statusClass}
+                                    />
+                                  </div>
                                 </div>
-                                <div className="mt-3">
-                                  <PipelineSteps
-                                    steps={steps}
-                                    statusClass={statusClass}
-                                  />
+                              )}
+
+                              {pipelineCode && (
+                                <div className="min-w-[280px] flex-1">
+                                  <PipelineCode code={pipelineCode} />
                                 </div>
-                              </div>
-                            )}
-
-                            {pipelineCode && (
-                              <div className="min-w-[280px] flex-1">
-                                <PipelineCode code={pipelineCode} />
-                              </div>
-                            )}
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      )}
+                        )}
 
-                      {finalError && (
-                        <div className="flex justify-start">
-                          <div className="max-w-[85%] rounded-lg border border-black bg-white px-4 py-2 text-sm text-black">
-                            {finalError}
+                        {finalError && (
+                          <div className="flex justify-start">
+                            <div className="max-w-[85%] rounded-lg border border-black bg-white px-4 py-2 text-sm text-black">
+                              {finalError}
+                            </div>
                           </div>
-                        </div>
-                      )}
-                    </div>
-                  </ScrollArea>
+                        )}
+                      </div>
+                    </ScrollArea>
 
-                  <div className="border border-black/30 bg-white px-4 py-4">
-                    <div className="flex flex-col gap-3">
-                      <Textarea
-                        placeholder="Describe the pipeline"
-                        value={input}
-                        onChange={(e) => setInput(e.target.value)}
-                        rows={3}
-                      />
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs text-zinc-500">
-                          {isLoading ? "Streaming..." : "Ready"}
-                        </span>
-                        <Button onClick={handleSubmit} disabled={isLoading}>
-                          Send
-                        </Button>
+                    <div className="sticky bottom-0 border-t border-black/10 bg-white px-4 py-4">
+                      <div className="flex flex-col gap-3">
+                        <Textarea
+                          placeholder="Describe the pipeline"
+                          value={input}
+                          onChange={(e) => setInput(e.target.value)}
+                          rows={3}
+                        />
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-zinc-500">
+                            {isLoading ? "Streaming..." : "Ready"}
+                          </span>
+                          <Button onClick={handleSubmit} disabled={isLoading}>
+                            Send
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   </div>
