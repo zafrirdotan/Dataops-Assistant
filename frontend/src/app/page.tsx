@@ -150,10 +150,24 @@ export default function Home() {
     setIsLoading(true);
 
     try {
+      // Build conversation history from current messages (excluding system/steps/code)
+      const conversationHistory = messages
+        .filter((msg) => msg.role === "user" || msg.role === "assistant")
+        .map((msg) => ({
+          role: msg.role,
+          content: msg.content,
+        }));
+
+      // Add the new user message
+      conversationHistory.push({ role: "user", content: trimmed });
+
       const res = await fetch("/api/chat/stream", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: trimmed, fast: false }),
+        body: JSON.stringify({
+          messages: conversationHistory,
+          fast: false,
+        }),
       });
 
       if (!res.ok || !res.body) {

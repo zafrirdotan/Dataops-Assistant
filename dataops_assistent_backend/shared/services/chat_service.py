@@ -48,10 +48,99 @@ class ChatService:
             "build_spec": build_spec
         }
 
-    async def process_message_stream(self, raw_message: str, fast: bool = False, run_after_deploy: bool = False) -> AsyncGenerator[dict, None]:
+    async def process_message_stream(
+        self,
+        raw_message: str = None,
+        messages: list[dict] = None,
+        fast: bool = False,
+        run_after_deploy: bool = False
+    ) -> AsyncGenerator[dict, None]:
         """
         Stream processing events for the user message and pipeline build steps.
+
+        Args:
+            raw_message: Single message (for backwards compatibility)
+            messages: Full conversation history in OpenAI format [{"role": "user/assistant", "content": "..."}]
+            fast: Fast mode flag
+            run_after_deploy: Whether to run after deployment
         """
+        # Build messages array from either messages or raw_message
+        if messages is None:
+            if raw_message is None:
+                raise ValueError("Either raw_message or messages must be provided")
+            messages = [{"role": "user", "content": raw_message}]
+
+        # Extract the latest user message for guards
+        latest_user_message = None
+        for msg in reversed(messages):
+            if msg.get("role") == "user":
+                latest_user_message = msg.get("content", "")
+                break
+
+        if not latest_user_message:
+            raise ValueError("No user message found in conversation history")
+
+        system_prompt = (
+            "You are a data engineering assistant. "
+            "Check if the user provided:\n"
+            "- Data source (type & location)\n"
+            "- Data destination (type & name)\n"
+            "- Transformations (if any)\n"
+            "- Schedule\n\n"
+            "If any are missing, briefly ask for them. "
+            "Optionally ask if they want to add a pipeline name. "
+            "Be concise.\n\n"
+            "Once you have all required details, use the build_pipeline tool to create the pipeline."
+        )
+
+        # Define the build_pipeline tool
+        tools = [
+            {
+                "type": "function",
+                "function": {
+                    "name": "build_pipeline",
+                    "description": "Build a data pipeline based on user requirements. Call this once you have all required information: data source, destination, transformations, and schedule.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "user_input": {
+                                "type": "string",
+                                "description": "The complete user requirements for the pipeline including source, destination, transformations, and schedule"
+                            }
+                        },
+                        "required": ["user_input"]
+                    }
+                }
+            }
+        ]
+
+        self.logger.info("Starting LLM guidance with tool support...")
+        synthesized_user_input = None
+
+        async for delta in self.llm_service.stream_response_with_tools(
+            system_prompt=system_prompt,
+            messages=messages,
+            tools=tools
+        ):
+            self.logger.debug(f"LLM delta: {delta}")
+
+            # Check if it's a tool call
+            if delta.get("type") == "tool_call" and delta.get("tool_name") == "build_pipeline":
+                # Extract the synthesized user input from the entire conversation
+                synthesized_user_input = delta.get("arguments", {}).get("user_input", latest_user_message)
+                yield {"event": "llm", "data": {"delta": "\n\nBuilding pipeline...\n"}}
+                break
+            else:
+                yield {"event": "llm", "data": {"delta": delta.get("delta", "")}}
+                if delta.get("done"):
+                    return
+
+        # If no tool was called, just return (conversation continues)
+        if synthesized_user_input is None:
+            return
+
+        # If we get here, tool was called with synthesized input from full conversation
+
         yield {
             "event": "step",
             "data": {
@@ -62,11 +151,12 @@ class ChatService:
             }
         }
 
+        # Validate the synthesized input from the full conversation
         guard_result, guard_error = await self._run_step(
             "Validating request...",
             0,
             self.run_guards_on_input,
-            raw_message,
+            synthesized_user_input,
             mode="chat"
         )
 
@@ -109,20 +199,6 @@ class ChatService:
                 "status": "completed"
             }
         }
-
-        if getattr(self.llm_service, "async_client", None):
-            guidance_prompt = (
-                "You are a data engineering assistant. "
-                "Given the user request, provide a short guidance on how to frame an ETL request, "
-                "and ask up to 5 clarifying questions only if needed. "
-                "Keep it concise.\n\n"
-                f"User request: {raw_message}"
-            )
-
-            async for delta in self.llm_service.stream_response(guidance_prompt):
-                yield {"event": "llm", "data": {"phase": "guidance", "delta": delta}}
-        else:
-            pass
 
         queue: asyncio.Queue = asyncio.Queue()
 

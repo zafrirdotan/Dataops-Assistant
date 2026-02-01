@@ -86,3 +86,72 @@ class LLMService:
 
         except Exception as e:
             yield f"LLM stream error: {e}"
+
+    async def stream_response_with_tools(self, system_prompt: str, messages: list[dict], tools: list) -> AsyncGenerator[dict, None]:
+        """
+        Stream response with tool support from the LLM provider.
+        Yields dictionaries with delta, tool_call info, or done status.
+
+        Args:
+            system_prompt: System prompt for the assistant
+            messages: Conversation history [{"role": "user/assistant", "content": "..."}]
+            tools: Tool definitions in OpenAI format
+        """
+        if self.provider != "openai" or not self.api_key or not self.async_client:
+            yield {"delta": "LLM is not configured.", "done": True}
+            return
+
+        try:
+            # Build full messages array with system prompt
+            full_messages = [{"role": "system", "content": system_prompt}] + messages
+
+            stream = await self.async_client.chat.completions.create(
+                model="gpt-4o",
+                messages=full_messages,
+                tools=tools,
+                temperature=0,
+                stream=True
+            )
+
+            full_content = ""
+            tool_calls = []
+
+            async for chunk in stream:
+                delta = chunk.choices[0].delta
+
+                # Handle text content
+                if delta.content:
+                    full_content += delta.content
+                    yield {"type": "text", "delta": delta.content}
+
+                # Handle tool calls
+                if delta.tool_calls:
+                    for tool_call in delta.tool_calls:
+                        if tool_call.index is not None:
+                            while len(tool_calls) <= tool_call.index:
+                                tool_calls.append({"id": "", "name": "", "arguments": ""})
+
+                            if tool_call.id:
+                                tool_calls[tool_call.index]["id"] = tool_call.id
+                            if tool_call.function.name:
+                                tool_calls[tool_call.index]["name"] = tool_call.function.name
+                            if tool_call.function.arguments:
+                                tool_calls[tool_call.index]["arguments"] += tool_call.function.arguments
+
+                # Check if done
+                if chunk.choices[0].finish_reason:
+                    if chunk.choices[0].finish_reason == "tool_calls" and tool_calls:
+                        # Parse and yield tool call
+                        import json
+                        for tool_call in tool_calls:
+                            yield {
+                                "type": "tool_call",
+                                "tool_name": tool_call["name"],
+                                "tool_call_id": tool_call["id"],
+                                "arguments": json.loads(tool_call["arguments"]) if tool_call["arguments"] else {}
+                            }
+                    yield {"done": True}
+                    return
+
+        except Exception as e:
+            yield {"delta": f"LLM stream error: {e}", "done": True}

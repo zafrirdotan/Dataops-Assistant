@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
+from typing import Optional, List
 from shared.services.chat_service import ChatService
 from dotenv import load_dotenv
 import json
@@ -9,11 +10,17 @@ load_dotenv()
 
 router = APIRouter()
 chat_service = ChatService()
+
+class Message(BaseModel):
+    role: str
+    content: str
+
 class ChatRequest(BaseModel):
     message: str
 
 class ChatStreamRequest(BaseModel):
-    message: str
+    message: Optional[str] = None
+    messages: Optional[List[Message]] = None
     fast: bool = False
     run_after_deploy: bool = False
 
@@ -47,11 +54,18 @@ def _format_sse(event: dict) -> str:
 async def chat_stream_endpoint(request: ChatStreamRequest):
     """
     SSE endpoint to stream chat events and pipeline build steps.
+    Accepts either a single message or full conversation history.
     """
 
     async def event_generator():
+        # Convert Pydantic models to dicts if messages provided
+        messages_list = None
+        if request.messages:
+            messages_list = [msg.model_dump() for msg in request.messages]
+
         async for event in chat_service.process_message_stream(
-            request.message,
+            raw_message=request.message,
+            messages=messages_list,
             fast=request.fast,
             run_after_deploy=request.run_after_deploy
         ):
