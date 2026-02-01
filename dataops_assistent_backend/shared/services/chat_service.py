@@ -181,17 +181,43 @@ class ChatService:
 
         if guard_result["guard_decision"] == "block":
             self.logger.warning("Input blocked by guards.")
+
+            # Format a user-friendly error message
+            error_msg = guard_result.get("error", "Request blocked by security policy.")
+
+            # If there are specific violations, include them
+            violations = guard_result.get("violations", [])
+            if violations:
+                violation_details = []
+                for v in violations:
+                    if v.get("violation_type") == "schedule":
+                        violation_details.append(f"Schedule '{v.get('value')}' is not allowed.")
+                    else:
+                        violation_details.append(f"{v.get('violation_type')}: {v.get('value')}")
+                if violation_details:
+                    error_msg = "\n".join(violation_details)
+
+            # If it's only a schedule violation, use just the schedule error
+            if violations and len(violations) == 1 and violations[0].get("violation_type") == "schedule":
+                error_msg = f"Schedule '{violations[0].get('value')}' is not allowed."
+
+            # Send error as LLM message so it appears in chat
+            yield {
+                "event": "llm",
+                "data": {"delta": f"\n\n❌ {error_msg}\n"}
+            }
+
             yield {
                 "event": "step",
                 "data": {
                     "step": "validate_request",
                     "step_number": 0,
                     "message": "Validating request...",
-                    "status": "completed"
+                    "status": "error",
+                    "error": error_msg if violations and violations[0].get("violation_type") == "schedule" else error_msg
                 }
             }
             yield {"event": "guard", "data": guard_result}
-            yield {"event": "final", "data": {"success": False, "guard": guard_result}}
             return
 
         yield {
