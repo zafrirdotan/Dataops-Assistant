@@ -3,9 +3,11 @@
 import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { PipelineNav } from "@/components/pipeline-nav";
+import { AppHeader } from "@/components/app-header";
+import { PipelineSteps } from "@/components/pipeline-steps";
+import { PipelineCode } from "@/components/pipeline-code";
 
 type ChatMessage = {
   role: "user" | "assistant" | "system";
@@ -32,6 +34,7 @@ export default function Home() {
   const [pipelineId, setPipelineId] = useState<string | null>(null);
   const [pipelineCode, setPipelineCode] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [finalError, setFinalError] = useState<string | null>(null);
 
   const statusClass = useMemo(
     () =>
@@ -110,11 +113,24 @@ export default function Home() {
       } else {
         setPipelineCode(JSON.stringify(data.pipeline_code, null, 2));
       }
-      if (data.error) {
+      if (data.success && data.pipeline_id) {
         setMessages((prev) => [
           ...prev,
-          { role: "system", content: data.error ?? "" },
+          {
+            role: "assistant",
+            content: `Pipeline ${data.pipeline_id} created successfully.`,
+          },
         ]);
+      }
+      if (data.error) {
+        if (data.error.includes("Pipeline tests failed")) {
+          setFinalError(data.error);
+        } else {
+          setMessages((prev) => [
+            ...prev,
+            { role: "system", content: data.error ?? "" },
+          ]);
+        }
       }
     }
   };
@@ -128,6 +144,7 @@ export default function Home() {
     setSteps([]);
     setPipelineId(null);
     setPipelineCode(null);
+    setFinalError(null);
     setIsLoading(true);
 
     try {
@@ -174,122 +191,138 @@ export default function Home() {
     }
   };
 
+  const hasAssistantMessage = messages.some(
+    (message) => message.role === "assistant",
+  );
+  const showSteps = steps.length > 0;
+
   return (
     <div className="min-h-screen bg-white text-black">
-      <main className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-6 py-10">
-        <header className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-semibold">DataOps Assistant</h1>
-            <p className="text-sm text-zinc-500">
-              Streaming ETL assistant with live pipeline steps.
-            </p>
-          </div>
-        </header>
+      <div className="mx-auto flex min-h-screen w-full">
+        <aside className="hidden w-72 lg:flex lg:sticky lg:self-start lg:h-[calc(100vh-4rem)]">
+          <PipelineNav />
+        </aside>
 
-        <div className="grid gap-6 lg:grid-cols-3">
-          <Card className="lg:col-span-2">
-            <CardHeader>
-              <CardTitle>Chat</CardTitle>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-4">
-              <ScrollArea className="h-[420px] rounded-md border border-zinc-200 p-4">
-                <div className="flex flex-col gap-3">
-                  {messages.length === 0 && (
-                    <div className="text-sm text-zinc-400">
-                      Ask for an ETL pipeline. Example: “Load CSV from
-                      ./data/transactions_1.csv to SQLite orders_daily, daily at
-                      2am”.
-                    </div>
-                  )}
-                  {messages.map((msg, idx) => (
-                    <div
-                      key={`${msg.role}-${idx}`}
-                      className={`flex ${
-                        msg.role === "user" ? "justify-end" : "justify-start"
-                      }`}
-                    >
-                      <div
-                        className={`max-w-[80%] rounded-lg px-4 py-2 text-sm leading-6 ${
-                          msg.role === "user"
-                            ? "bg-black text-white"
-                            : msg.role === "system"
-                              ? "border border-black bg-white text-black"
-                              : "bg-zinc-100 text-black"
-                        }`}
-                      >
-                        {msg.content}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </ScrollArea>
+        <main className="flex flex-1 flex-col gap-6">
+          <AppHeader />
 
-              <div className="flex flex-col gap-3">
-                <Textarea
-                  placeholder="Describe the pipeline you want..."
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  rows={3}
-                />
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-zinc-500">
-                    {isLoading ? "Streaming..." : "Ready"}
-                  </span>
-                  <Button onClick={handleSubmit} disabled={isLoading}>
-                    Send
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <div className="flex flex-col gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Pipeline Steps</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex flex-col gap-3">
-                  {steps.length === 0 && (
-                    <p className="text-sm text-zinc-400">No steps yet.</p>
-                  )}
-                  {steps.map((step) => (
-                    <div key={step.step} className="flex flex-col gap-1">
+          <div className="flex flex-1 items-stretch justify-center">
+            <div className="flex w-full flex-col gap-4">
+              {messages.length === 0 && !isLoading ? (
+                <div className="flex flex-1 items-center justify-center w-1/2 mx-auto -mt-50">
+                  <div className="w-full">
+                    <h2 className="mb-3 text-center text-3xl font-semibold py-10">
+                      Describe the pipeline
+                    </h2>
+                    <div className="mt-4 flex gap-3 border border-black/30 px-4 py-4 rounded-md">
+                      <Textarea
+                        placeholder="Describe the pipeline"
+                        value={input}
+                        onChange={(e) => setInput(e.target.value)}
+                        rows={4}
+                        className="border-0 resize-none shadow-none outline-none focus-visible:ring-0 focus-visible:ring-offset-0"
+                      />
                       <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium">
-                          {step.step_number}. {step.step}
-                        </span>
-                        <Badge className={statusClass[step.status] ?? ""}>
-                          {step.status}
-                        </Badge>
+                        <Button onClick={handleSubmit}>Send</Button>
                       </div>
-                      <p className="text-xs text-zinc-500">{step.message}</p>
-                      {step.error && (
-                        <p className="text-xs text-black">{step.error}</p>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <ScrollArea className="flex-1 min-h-[360px] rounded-md border border-black/10 bg-white p-4">
+                    <div className="flex flex-col gap-4">
+                      {messages.map((message, idx) => (
+                        <div
+                          key={`${message.role}-${idx}`}
+                          className={`flex ${
+                            message.role === "user"
+                              ? "justify-end"
+                              : "justify-start"
+                          }`}
+                        >
+                          <div
+                            className={`max-w-[85%] rounded-lg px-4 py-2 text-sm leading-6 ${
+                              message.role === "user"
+                                ? "bg-black text-white"
+                                : message.role === "system"
+                                  ? "border border-black bg-white text-black"
+                                  : "bg-zinc-100 text-black"
+                            }`}
+                          >
+                            {message.content}
+                          </div>
+                        </div>
+                      ))}
+
+                      {isLoading && !hasAssistantMessage && (
+                        <div className="flex justify-start">
+                          <div className="max-w-[85%] rounded-lg bg-zinc-100 px-4 py-2 text-sm text-black">
+                            Starting work...
+                          </div>
+                        </div>
+                      )}
+
+                      {(showSteps || pipelineCode) && (
+                        <div className="flex justify-start">
+                          <div className="flex w-full flex-wrap gap-4">
+                            {showSteps && (
+                              <div className="w-[300px] rounded-lg border border-black/10 bg-white px-4 py-3">
+                                <div className="text-xs font-semibold text-zinc-500">
+                                  Pipeline steps
+                                </div>
+                                <div className="mt-3">
+                                  <PipelineSteps
+                                    steps={steps}
+                                    statusClass={statusClass}
+                                  />
+                                </div>
+                              </div>
+                            )}
+
+                            {pipelineCode && (
+                              <div className="min-w-[280px] flex-1">
+                                <PipelineCode code={pipelineCode} />
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {finalError && (
+                        <div className="flex justify-start">
+                          <div className="max-w-[85%] rounded-lg border border-black bg-white px-4 py-2 text-sm text-black">
+                            {finalError}
+                          </div>
+                        </div>
                       )}
                     </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
+                  </ScrollArea>
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Pipeline Output</CardTitle>
-              </CardHeader>
-              <CardContent className="flex flex-col gap-3">
-                <div className="text-sm">
-                  <span className="text-zinc-500">Pipeline ID:</span>{" "}
-                  <span className="font-medium">{pipelineId ?? "—"}</span>
-                </div>
-                <div className="rounded-md border border-zinc-200 bg-zinc-50 p-3 text-xs text-zinc-700 max-h-[220px] overflow-auto whitespace-pre-wrap">
-                  {pipelineCode ?? "Pipeline code will appear here."}
-                </div>
-              </CardContent>
-            </Card>
+                  <div className="border border-black/30 bg-white px-4 py-4">
+                    <div className="flex flex-col gap-3">
+                      <Textarea
+                        placeholder="Describe the pipeline"
+                        value={input}
+                        onChange={(e) => setInput(e.target.value)}
+                        rows={3}
+                      />
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-zinc-500">
+                          {isLoading ? "Streaming..." : "Ready"}
+                        </span>
+                        <Button onClick={handleSubmit} disabled={isLoading}>
+                          Send
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
-        </div>
-      </main>
+        </main>
+      </div>
     </div>
   );
 }
