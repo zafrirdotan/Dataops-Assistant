@@ -376,7 +376,7 @@ export default function Home() {
                             </div>
                           </div>
                         )}
-                        
+
                         {/* Scroll anchor */}
                         <div ref={scrollEndRef} />
                       </div>
