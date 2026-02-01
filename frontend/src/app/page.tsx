@@ -1,12 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { PipelineNav } from "@/components/pipeline-nav";
 import { AppHeader } from "@/components/app-header";
 import { PipelineSteps } from "@/components/pipeline-steps";
 import { PipelineCode } from "@/components/pipeline-code";
-import { ChatInput } from "@/components/chat-input";
+import { ChatInput, ChatInputHandle } from "@/components/chat-input";
+import { PipelineExamples } from "@/components/pipeline-examples";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
@@ -37,6 +38,13 @@ export default function Home() {
   const [pipelineCode, setPipelineCode] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [finalError, setFinalError] = useState<string | null>(null);
+  const chatInputRef = useRef<ChatInputHandle>(null);
+  const scrollEndRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll to bottom when new messages, steps, or pipeline data arrive
+  useEffect(() => {
+    scrollEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, steps, pipelineCode, finalError]);
 
   const statusClass = useMemo(
     () =>
@@ -233,10 +241,15 @@ export default function Home() {
                       Describe the pipeline
                     </h2>
                     <ChatInput
+                      ref={chatInputRef}
                       value={input}
                       onChange={setInput}
                       onSubmit={handleSubmit}
                       disabled={disableSend}
+                    />
+                    <PipelineExamples
+                      onSelectExample={setInput}
+                      onFocus={() => chatInputRef.current?.focus()}
                     />
                   </div>
                 </div>
@@ -363,18 +376,23 @@ export default function Home() {
                             </div>
                           </div>
                         )}
+                        
+                        {/* Scroll anchor */}
+                        <div ref={scrollEndRef} />
                       </div>
                     </ScrollArea>
 
                     <div className="sticky bottom-0 border-t border-black/10 bg-white px-4 py-4">
-                      <ChatInput
-                        value={input}
-                        onChange={setInput}
-                        onSubmit={handleSubmit}
-                        disabled={disableSend}
-                        showStatus
-                        statusText={isLoading ? "Streaming..." : "Ready"}
-                      />
+                      <div className="w-1/2 mx-auto">
+                        <ChatInput
+                          value={input}
+                          onChange={setInput}
+                          onSubmit={handleSubmit}
+                          disabled={disableSend}
+                          showStatus
+                          statusText={isLoading ? "Streaming..." : "Ready"}
+                        />
+                      </div>
                     </div>
                   </div>
                 </>

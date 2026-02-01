@@ -1,3 +1,4 @@
+import { forwardRef, useImperativeHandle, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 
@@ -11,36 +12,64 @@ type ChatInputProps = {
   className?: string;
 };
 
-export function ChatInput({
-  value,
-  onChange,
-  onSubmit,
-  disabled = false,
-  showStatus = false,
-  statusText,
-  className,
-}: ChatInputProps) {
-  return (
-    <div className={className}>
-      <div className="mt-4 flex gap-3 border border-black/30 px-4 py-4 rounded-md">
-        <Textarea
-          placeholder="Describe the pipeline"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          rows={4}
-          className="border-0 resize-none shadow-none outline-none focus-visible:ring-0 focus-visible:ring-offset-0"
-        />
-        <div className="flex items-center justify-between">
-          <Button onClick={onSubmit} disabled={disabled}>
-            Send
-          </Button>
-        </div>
-      </div>
-      {showStatus && (
-        <div className="mt-2 text-xs text-zinc-500">
-          {statusText ?? "Ready"}
-        </div>
-      )}
-    </div>
-  );
+export interface ChatInputHandle {
+  focus: () => void;
 }
+
+export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
+  function ChatInput(
+    {
+      value,
+      onChange,
+      onSubmit,
+      disabled = false,
+      showStatus = false,
+      statusText,
+      className,
+    }: ChatInputProps,
+    ref,
+  ) {
+    const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+    useImperativeHandle(ref, () => ({
+      focus: () => {
+        textareaRef.current?.focus();
+      },
+    }));
+
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        if (!disabled) {
+          onSubmit();
+        }
+      }
+    };
+
+    return (
+      <div className={className}>
+        <div className="mt-4 flex gap-3 border border-black/30 px-4 py-4 rounded-md">
+          <Textarea
+            ref={textareaRef}
+            placeholder="Describe the pipeline"
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            onKeyDown={handleKeyDown}
+            rows={4}
+            className="border-0 resize-none shadow-none outline-none focus-visible:ring-0 focus-visible:ring-offset-0"
+          />
+          <div className="flex items-center justify-between">
+            <Button onClick={onSubmit} disabled={disabled}>
+              Send
+            </Button>
+          </div>
+        </div>
+        {showStatus && (
+          <div className="mt-2 text-xs text-zinc-500">
+            {statusText ?? "Ready"}
+          </div>
+        )}
+      </div>
+    );
+  },
+);
