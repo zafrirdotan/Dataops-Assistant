@@ -6,7 +6,10 @@ export async function POST(req: Request) {
 
   const response = await fetch(`${backendUrl}/chat/stream`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      Cookie: req.headers.get("cookie") || "", // Forward cookies to backend
+    },
     body: JSON.stringify(body),
   });
 

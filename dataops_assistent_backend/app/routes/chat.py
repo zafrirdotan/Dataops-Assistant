@@ -1,8 +1,10 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from typing import Optional, List
 from shared.services.chat_service import ChatService
+from app.core.deps import get_current_active_user
+from shared.models.user import User
 from dotenv import load_dotenv
 import json
 
@@ -51,10 +53,14 @@ def _format_sse(event: dict) -> str:
 
 
 @router.post("/stream")
-async def chat_stream_endpoint(request: ChatStreamRequest):
+async def chat_stream_endpoint(
+    request: ChatStreamRequest,
+    current_user: User = Depends(get_current_active_user)
+):
     """
     SSE endpoint to stream chat events and pipeline build steps.
     Accepts either a single message or full conversation history.
+    Requires authentication.
     """
 
     async def event_generator():

@@ -8,6 +8,7 @@ import { PipelineSteps } from "@/components/pipeline-steps";
 import { PipelineCode } from "@/components/pipeline-code";
 import { ChatInput, ChatInputHandle } from "@/components/chat-input";
 import { PipelineExamples } from "@/components/pipeline-examples";
+import { AuthDialog } from "@/components/auth-dialog";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
@@ -38,6 +39,7 @@ export default function Home() {
   const [pipelineCode, setPipelineCode] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [finalError, setFinalError] = useState<string | null>(null);
+  const [showAuthDialog, setShowAuthDialog] = useState(false);
   const chatInputRef = useRef<ChatInputHandle>(null);
   const scrollEndRef = useRef<HTMLDivElement>(null);
 
@@ -179,6 +181,19 @@ export default function Home() {
       });
 
       if (!res.ok || !res.body) {
+        // Check if it's an authentication error
+        if (res.status === 401 || res.status === 403) {
+          setShowAuthDialog(true);
+          setMessages((prev) => [
+            ...prev,
+            {
+              role: "system",
+              content: "Authentication required. Please login to continue.",
+            },
+          ]);
+          return;
+        }
+
         const text = await res.text();
         setMessages((prev) => [
           ...prev,
@@ -401,6 +416,9 @@ export default function Home() {
           </div>
         </main>
       </div>
+
+      {/* Authentication Dialog */}
+      <AuthDialog open={showAuthDialog} onOpenChange={setShowAuthDialog} />
     </div>
   );
 }
