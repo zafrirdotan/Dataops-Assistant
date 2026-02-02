@@ -1,7 +1,10 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from app.routes import chat
 from app.routes import pipeline
+from app.routes import auth
+from app.routes import users
 from shared.services.storage_service import MinioStorage
 from shared.services.database_service import get_database_service
 import logging
@@ -27,13 +30,13 @@ async def main(app: FastAPI):
         # Initialize MinIO service and buckets
         await storage_service.initialize_pipeline_buckets()
         logger.info("MinIO service and pipeline buckets initialized successfully")
-        
+
         # Test database connection asynchronously
         if await database_service.test_connection():
             logger.info("Database connection established successfully")
         else:
             logger.warning("Database connection test failed")
-        
+
         yield
     except Exception as e:
         logger.error(f"Failed to initialize services: {e}")
@@ -49,6 +52,15 @@ app = FastAPI(
     lifespan=main
 )
 
+# Configure CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],  # Frontend URL
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 @app.get("/")
 def read_root():
     return {
@@ -60,14 +72,14 @@ def read_root():
 @app.get("/health")
 async def health_check():
     health_status = {
-        "status": "healthy", 
+        "status": "healthy",
         "service": "dataops-assistant",
         "components": {
             "database": "unknown",
             "storage": "unknown"
         }
     }
-    
+
     # Check database connection
     try:
         if await database_service.test_connection():
@@ -92,9 +104,11 @@ async def health_check():
             health_status["components"]["storage"] = "unhealthy"
     except Exception as e:
         health_status["components"]["storage"] = "unhealthy"
-    
+
     return health_status
 
 # Include routers
+app.include_router(auth.router)
+app.include_router(users.router)
 app.include_router(chat.router, prefix="/chat", tags=["chat"])
 app.include_router(pipeline.router, tags=["pipeline"])
