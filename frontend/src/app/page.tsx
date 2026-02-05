@@ -13,24 +13,6 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
 
-type ChatMessage = {
-  role: "user" | "assistant" | "system" | "steps" | "code";
-  content: string;
-};
-
-type StepEvent = {
-  step: string;
-  step_number: number;
-  message: string;
-  status: string;
-  error?: string;
-};
-
-type SSEEvent = {
-  event: string;
-  data: Record<string, unknown>;
-};
-
 export default function Home() {
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -92,7 +74,7 @@ export default function Home() {
     if (evt.event === "step") {
       const stepData = evt.data as StepEvent;
       setSteps((prev) => {
-        const idx = prev.findIndex((s) => s.step === stepData.step);
+        const idx = prev.findIndex((s) => s.step_name === stepData.step_name);
         if (idx === -1) return [...prev, stepData];
         const next = [...prev];
         next[idx] = { ...next[idx], ...stepData };
@@ -331,10 +313,7 @@ export default function Home() {
                                         Pipeline steps
                                       </div>
                                       <div className="mt-3">
-                                        <PipelineSteps
-                                          steps={steps}
-                                          statusClass={statusClass}
-                                        />
+                                        <PipelineSteps steps={steps} />
                                       </div>
                                     </div>
                                   )}
@@ -367,10 +346,7 @@ export default function Home() {
                                     Pipeline steps
                                   </div>
                                   <div className="mt-3">
-                                    <PipelineSteps
-                                      steps={steps}
-                                      statusClass={statusClass}
-                                    />
+                                    <PipelineSteps steps={steps} />
                                   </div>
                                 </div>
                               )}

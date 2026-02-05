@@ -1,5 +1,5 @@
 type PipelineStepsProps = {
-  steps: BuildStep[];
+  steps: StepEvent[];
 };
 
 const statusClass: Record<string, string> = {
