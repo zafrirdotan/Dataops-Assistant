@@ -8,14 +8,13 @@ CREATE SCHEMA IF NOT EXISTS dw;
 -- Create tables for storing pipeline metadata
 CREATE TABLE IF NOT EXISTS dataops_assistent.pipelines (
     id SERIAL PRIMARY KEY,
-    pipeline_id VARCHAR NOT NULL,
+    pipeline_id VARCHAR NOT NULL UNIQUE,
     name VARCHAR NOT NULL,
-    created_by VARCHAR,
+    created_by VARCHAR NOT NULL,
     description VARCHAR,
-    created_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ,
     status VARCHAR,
-    run_list JSON,
     spec JSON,
     image_id VARCHAR
 );
@@ -67,3 +66,65 @@ CREATE TABLE IF NOT EXISTS public.users (
 -- Create indexes for users table
 CREATE INDEX IF NOT EXISTS idx_users_username ON public.users(username);
 CREATE INDEX IF NOT EXISTS idx_users_email ON public.users(email);
+
+-- Create message content type enum
+DO $$ BEGIN
+    CREATE TYPE dataops_assistent.message_content_type AS ENUM ('text', 'code', 'steps', 'error');
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
+
+-- Create chats table for managing conversations
+CREATE TABLE IF NOT EXISTS dataops_assistent.chats (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    pipeline_id VARCHAR(255),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_pipeline
+        FOREIGN KEY (pipeline_id)
+        REFERENCES dataops_assistent.pipelines(pipeline_id)
+        ON DELETE SET NULL
+);
+
+-- Create chat_messages table for storing conversation history
+CREATE TABLE IF NOT EXISTS dataops_assistent.chat_messages (
+    id SERIAL PRIMARY KEY,
+    chat_id UUID NOT NULL,
+    role VARCHAR NOT NULL,
+    content TEXT NOT NULL,
+    extra_data JSONB, -- Contains: { type: 'code' | 'steps'?, steps: [...], Code: '...' }
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    CONSTRAINT fk_chat
+        FOREIGN KEY (chat_id)
+        REFERENCES dataops_assistent.chats(id)
+        ON DELETE CASCADE
+);
+
+-- Create indexes for chats table
+CREATE INDEX IF NOT EXISTS idx_chats_pipeline_id ON dataops_assistent.chats(pipeline_id);
+
+-- Create indexes for chat_messages table
+CREATE INDEX IF NOT EXISTS idx_chat_messages_chat_id ON dataops_assistent.chat_messages(chat_id);
+CREATE INDEX IF NOT EXISTS idx_chat_messages_created_at ON dataops_assistent.chat_messages(created_at);
+
+-- Create steps table for storing pipeline execution steps
+CREATE TABLE IF NOT EXISTS dataops_assistent.steps (
+    id SERIAL PRIMARY KEY,
+    chat_id UUID NOT NULL,
+    step_name VARCHAR(255) NOT NULL,
+    step_type VARCHAR(100),
+    status VARCHAR(50) DEFAULT 'pending',
+    code TEXT,
+    output TEXT,
+    error_message TEXT,
+    started_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    completed_at TIMESTAMP WITH TIME ZONE,
+    extra_data JSONB,
+    CONSTRAINT fk_step_chat
+        FOREIGN KEY (chat_id)
+        REFERENCES dataops_assistent.chats(id)
+        ON DELETE CASCADE
+);
+
+-- Create indexes for steps table
+CREATE INDEX IF NOT EXISTS idx_steps_chat_id ON dataops_assistent.steps(chat_id);
+CREATE INDEX IF NOT EXISTS idx_steps_status ON dataops_assistent.steps(status);

@@ -1,4 +1,17 @@
-from typing import TypedDict, Any
+from typing import Any
+from typing_extensions import TypedDict
+
+class Pipeline(TypedDict, total=False):
+    id: int
+    pipeline_id: str
+    name: str
+    created_by: str
+    description: str
+    created_at: str
+    updated_at: str | None
+    status: str
+    spec: dict[str, Any]
+    image_id: str | None
 
 class PipelineBuildResponse(TypedDict, total=False):
     pipeline_name: str | None
@@ -13,5 +26,3 @@ class PipelineBuildResponse(TypedDict, total=False):
     scheduling_result: dict[str, Any]
     execution_time: int | None
     error: str | None
-
-

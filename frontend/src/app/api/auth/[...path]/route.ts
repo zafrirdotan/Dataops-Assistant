@@ -1,6 +1,6 @@
 export const runtime = "nodejs";
 
-const BACKEND_URL = process.env.DATAOPS_BACKEND_URL ?? "http://localhost:8000";
+const BACKEND_URL = process.env.DATAOPS_BACKEND_URL ?? "http://localhost:8080";
 
 export async function GET(
   req: Request,

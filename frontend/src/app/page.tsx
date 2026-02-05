@@ -40,6 +40,7 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(false);
   const [finalError, setFinalError] = useState<string | null>(null);
   const [showAuthDialog, setShowAuthDialog] = useState(false);
+  const [chatId, setChatId] = useState<string | null>(null);
   const chatInputRef = useRef<ChatInputHandle>(null);
   const scrollEndRef = useRef<HTMLDivElement>(null);
 
@@ -80,6 +81,14 @@ export default function Home() {
   };
 
   const handleEvent = (evt: SSEEvent) => {
+    if (evt.event === "chat_created") {
+      const data = evt.data as { chat_id?: string };
+      if (data.chat_id) {
+        setChatId(data.chat_id);
+      }
+      return;
+    }
+
     if (evt.event === "step") {
       const stepData = evt.data as StepEvent;
       setSteps((prev) => {
@@ -160,22 +169,13 @@ export default function Home() {
     setIsLoading(true);
 
     try {
-      // Build conversation history from current messages (excluding system/steps/code)
-      const conversationHistory = messages
-        .filter((msg) => msg.role === "user" || msg.role === "assistant")
-        .map((msg) => ({
-          role: msg.role,
-          content: msg.content,
-        }));
-
-      // Add the new user message
-      conversationHistory.push({ role: "user", content: trimmed });
-
+      // Send only chat_id and new message - backend fetches full history from DB
       const res = await fetch("/api/chat/stream", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          messages: conversationHistory,
+          chat_id: chatId,
+          message: trimmed,
           fast: false,
         }),
       });

@@ -129,6 +129,17 @@ class PipelineBuilderService:
                 return {"error": f"Failed to generate pipeline code: {error}"}
             await self._emit_step(event_callback, build_step, step_number, step_msg, "completed")
 
+            # Emit code_generated event with the pipeline code
+            if event_callback and pipeline_code and "pipeline" in pipeline_code:
+                await event_callback({
+                    "event": "code_generated",
+                    "data": {
+                        "pipeline": pipeline_code["pipeline"],
+                        "tests": pipeline_code.get("pipeline_tests", ""),
+                        "requirements": pipeline_code.get("requirements", ""),
+                    }
+                })
+
             # Step 5: Store pipeline files
 
             build_step = "store_pipeline_files"

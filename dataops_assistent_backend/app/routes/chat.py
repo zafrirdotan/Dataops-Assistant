@@ -1,7 +1,6 @@
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
-from typing import Optional, List
+from shared.models.chat import ChatRequest, ChatStreamRequest
 from shared.services.chat_service import ChatService
 from app.core.deps import get_current_active_user
 from shared.models.user import User
@@ -13,18 +12,6 @@ load_dotenv()
 router = APIRouter()
 chat_service = ChatService()
 
-class Message(BaseModel):
-    role: str
-    content: str
-
-class ChatRequest(BaseModel):
-    message: str
-
-class ChatStreamRequest(BaseModel):
-    message: Optional[str] = None
-    messages: Optional[List[Message]] = None
-    fast: bool = False
-    run_after_deploy: bool = False
 
 @router.post("/")
 async def chat_endpoint(request: ChatRequest):
@@ -61,6 +48,7 @@ async def chat_stream_endpoint(
     SSE endpoint to stream chat events and pipeline build steps.
     Accepts either a single message or full conversation history.
     Requires authentication.
+    Chat messages are automatically saved to the database.
     """
 
     async def event_generator():
@@ -69,7 +57,9 @@ async def chat_stream_endpoint(
         if request.messages:
             messages_list = [msg.model_dump() for msg in request.messages]
 
-        async for event in chat_service.process_message_stream(
+        # Delegate all business logic to service, only handle SSE formatting here
+        async for event in chat_service.process_chat_stream_with_persistence(
+            chat_id=request.chat_id,
             raw_message=request.message,
             messages=messages_list,
             fast=request.fast,
@@ -82,3 +72,39 @@ async def chat_stream_endpoint(
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache"}
     )
+
+
+@router.get("/history/{chat_id}")
+async def get_chat_history(
+    chat_id: str,
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Get chat history for a specific chat.
+    """
+    try:
+        messages = await chat_service.get_chat_history(chat_id)
+        return {"messages": messages}
+    except Exception as e:
+        raise HTTPException(status_code=404, detail=f"Failed to retrieve chat history: {str(e)}")
+
+
+@router.get("/by-pipeline/{pipeline_id}")
+async def get_chat_by_pipeline(
+    pipeline_id: str,
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Get chat ID for a specific pipeline. Used by sidebar to load chat when clicking a pipeline.
+    """
+    try:
+        chat_id = await chat_service.get_chat_id_by_pipeline(pipeline_id)
+
+        if not chat_id:
+            raise HTTPException(status_code=404, detail=f"No chat found for pipeline {pipeline_id}")
+
+        return {"chat_id": chat_id}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve chat: {str(e)}")

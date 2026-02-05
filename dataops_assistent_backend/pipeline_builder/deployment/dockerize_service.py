@@ -1,9 +1,8 @@
-import docker 
+import docker
 import os
-import aiofiles
-import shutil
 import asyncio
 import json
+import aiofiles
 
 from ..deployment.pipeline_output_service import PipelineOutputService
 
@@ -96,7 +95,6 @@ class DockerizeService:
         """
         Build and start a pipeline container, returning the container ID. Reuses build context if it exists.
         """
-        import aiofiles
         build_dir = f"/tmp/pipeline_builds/{pipeline_id}"
         os.makedirs(build_dir, exist_ok=True)
         try:
@@ -111,7 +109,7 @@ class DockerizeService:
         # Write pipeline files to build context
         pipeline_file = os.path.join(build_dir, "pipeline.py")
         dockerfile_path = os.path.join(build_dir, "Dockerfile")
-        metadata_file = os.path.join(build_dir, "metadata.json")   
+        metadata_file = os.path.join(build_dir, "metadata.json")
 
         async with aiofiles.open(pipeline_file, 'w') as f:
             await f.write(stored_files.get('pipeline', ''))
@@ -147,7 +145,7 @@ class DockerizeService:
             return {"success": False, "details": f"Failed to build Docker image: {e}"}
 
         # Start the container and return its ID
-   
+
         container_name = f"pipeline_{pipeline_id}_container"
         try:
             # Remove existing container with the same name if it exists

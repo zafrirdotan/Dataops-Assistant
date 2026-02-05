@@ -1,13 +1,17 @@
 import json
 import logging
 import asyncio
-from typing import AsyncGenerator
+from typing import AsyncGenerator, Optional
+import uuid
+
+from sqlalchemy import select, update
 
 from shared.services.llm_service import LLMService
-from pipeline_builder.guards.prompt_guard_service import PromptGuardService
+from pipeline_builder.guards.guards_service import GuardsService
 from pipeline_builder import PipelineBuilderService
 from shared.services.storage_service import MinioStorage
-import logging
+from shared.services.database_service import get_database_service
+from shared.models.chat_orm import Chat, ChatMessage
 
 from shared.utils.spinner_utils import run_step_with_spinner
 logger = logging.getLogger("dataops")
@@ -16,9 +20,10 @@ class ChatService:
     def __init__(self):
         self.logger = logger
         self.llm_service = LLMService()
-        self.prompt_guard_service = PromptGuardService(log=self.logger)
+        self.guards_service = GuardsService(log=self.logger)
         self.pipeline_builder_service = PipelineBuilderService()
         self.storage_service = MinioStorage()
+        self.db_service = get_database_service()
 
     async def process_message(self, raw_message: str, fast: bool = False, mode: str = "chat", run_after_deploy: bool = False) -> dict:
         """
@@ -133,103 +138,60 @@ class ChatService:
                 # Extract the synthesized user input from the entire conversation
                 synthesized_user_input = delta.get("arguments", {}).get("user_input", latest_user_message)
                 yield {"event": "llm", "data": {"delta": "\n\nBuilding pipeline...\n"}}
-                break
+
+                # Execute the build_pipeline tool
+                async for event in self._execute_build_pipeline_tool(
+                    synthesized_user_input,
+                    fast=fast,
+                    run_after_deploy=run_after_deploy
+                ):
+                    yield event
+                return
             else:
                 yield {"event": "llm", "data": {"delta": delta.get("delta", "")}}
                 if delta.get("done"):
                     return
 
-        # If no tool was called, just return (conversation continues)
-        if synthesized_user_input is None:
-            return
+    async def _execute_build_pipeline_tool(
+        self,
+        synthesized_user_input: str,
+        fast: bool = False,
+        run_after_deploy: bool = False
+    ) -> AsyncGenerator[dict, None]:
+        """
+        Execute the build_pipeline tool: validate input and build the pipeline.
 
-        # If we get here, tool was called with synthesized input from full conversation
+        Args:
+            synthesized_user_input: The synthesized user input from LLM
+            fast: Fast mode flag
+            run_after_deploy: Whether to run after deployment
 
-        yield {
-            "event": "step",
-            "data": {
-                "step": "validate_request",
-                "step_number": 0,
-                "message": "Validating request...",
-                "status": "started"
-            }
-        }
-
-        # Validate the synthesized input from the full conversation
-        guard_result, guard_error = await self._run_step(
-            "Validating request...",
-            0,
-            self.run_guards_on_input,
+        Yields:
+            Event dictionaries for validation and pipeline building
+        """
+        # Validate input using GuardsService - it handles all events
+        guard_result = None
+        async for event in self.guards_service.validate_with_events(
             synthesized_user_input,
-            mode="chat"
-        )
+            step_name="validate_request",
+            step_number=0
+        ):
+            # Capture validation result for pipeline building
+            if event.get("event") == "validation_result":
+                guard_result = event.get("data")
+            else:
+                # Relay all other events (step, llm, guard, final)
+                yield event
 
-        if guard_error:
-            self.logger.error(f"Error during input guards: {guard_error}")
-            yield {
-                "event": "step",
-                "data": {
-                    "step": "validate_request",
-                    "step_number": 0,
-                    "message": "Validating request...",
-                    "status": "error",
-                    "error": str(guard_error)
-                }
-            }
-            yield {"event": "final", "data": {"success": False, "error": str(guard_error)}}
+            # If validation failed, guard service already sent final event
+            if event.get("event") == "final":
+                return
+
+        # If we don't have a guard_result, validation failed
+        if not guard_result:
             return
 
-        if guard_result["guard_decision"] == "block":
-            self.logger.warning("Input blocked by guards.")
-
-            # Format a user-friendly error message
-            error_msg = guard_result.get("error", "Request blocked by security policy.")
-
-            # If there are specific violations, include them
-            violations = guard_result.get("violations", [])
-            if violations:
-                violation_details = []
-                for v in violations:
-                    if v.get("violation_type") == "schedule":
-                        violation_details.append(f"Schedule '{v.get('value')}' is not allowed.")
-                    else:
-                        violation_details.append(f"{v.get('violation_type')}: {v.get('value')}")
-                if violation_details:
-                    error_msg = "\n".join(violation_details)
-
-            # If it's only a schedule violation, use just the schedule error
-            if violations and len(violations) == 1 and violations[0].get("violation_type") == "schedule":
-                error_msg = f"Schedule '{violations[0].get('value')}' is not allowed."
-
-            # Send error as LLM message so it appears in chat
-            yield {
-                "event": "llm",
-                "data": {"delta": f"\n\n❌ {error_msg}\n"}
-            }
-
-            yield {
-                "event": "step",
-                "data": {
-                    "step": "validate_request",
-                    "step_number": 0,
-                    "message": "Validating request...",
-                    "status": "error",
-                    "error": error_msg if violations and violations[0].get("violation_type") == "schedule" else error_msg
-                }
-            }
-            yield {"event": "guard", "data": guard_result}
-            return
-
-        yield {
-            "event": "step",
-            "data": {
-                "step": "validate_request",
-                "step_number": 0,
-                "message": "Validating request...",
-                "status": "completed"
-            }
-        }
-
+        # Build the pipeline
         queue: asyncio.Queue = asyncio.Queue()
 
         async def on_event(payload: dict):
@@ -276,44 +238,337 @@ class ChatService:
             }
         }
 
+    async def create_new_chat(self) -> Optional[str]:
+        """
+        Create a new chat record in the database using ORM.
+        Generates a new UUID for the chat.
+
+        Returns:
+            The chat_id as string if successful, None otherwise
+        """
+        try:
+            chat_id = uuid.uuid4()
+            async with self.db_service.AsyncSessionLocal() as session:
+                new_chat = Chat(id=chat_id)
+                session.add(new_chat)
+                await session.commit()
+            return str(chat_id)
+        except Exception as e:
+            self.logger.error(f"Failed to create chat: {e}")
+            return None
+
+    async def process_chat_stream_with_persistence(
+        self,
+        chat_id: Optional[str] = None,
+        raw_message: Optional[str] = None,
+        messages: Optional[list[dict]] = None,
+        fast: bool = False,
+        run_after_deploy: bool = False
+    ) -> AsyncGenerator[dict, None]:
+        """
+        Complete streaming workflow: create chat if needed, process messages,
+        accumulate state, and save to database.
+
+        This method handles all business logic for streaming chat interactions,
+        keeping the route layer thin and focused on HTTP/SSE concerns.
+
+        Args:
+            chat_id: Optional existing chat ID. If None, creates a new chat.
+            raw_message: Single message for backwards compatibility
+            messages: Full conversation history
+            fast: Fast mode flag
+            run_after_deploy: Whether to run pipeline after deployment
+
+        Yields:
+            Event dictionaries ready for SSE formatting
+        """
+        # Create chat if needed
+        if not chat_id:
+            chat_id = await self.create_new_chat()
+            if chat_id:
+                yield {"event": "chat_created", "data": {"chat_id": chat_id}}
+
+        # If chat_id provided but no messages, fetch full history from DB
+        if chat_id and not messages:
+            db_messages = await self.get_chat_history(chat_id)
+            messages = [{"role": msg["role"], "content": msg["content"]}
+                       for msg in db_messages]
+            # Add new message to conversation
+            if raw_message:
+                messages.append({"role": "user", "content": raw_message})
+
+        # State accumulation
+        pipeline_id = None
+        pipeline_code = None
+        assistant_response = ""
+        build_steps = {}  # Track steps by step name/number, keep only final state
+        user_message = raw_message or (messages[-1]["content"] if messages else "")
+
+        # Save user message immediately if we have a chat_id
+        if chat_id and user_message:
+            async with self.db_service.AsyncSessionLocal() as session:
+                await self.save_user_message(chat_id, user_message, session=session)
+                await session.commit()
+
+        # Stream events and accumulate state
+        async for event in self.process_message_stream(
+            raw_message=raw_message,
+            messages=messages,
+            fast=fast,
+            run_after_deploy=run_after_deploy
+        ):
+            event_type = event.get("event")
+            event_data = event.get("data", {})
+
+            match event_type:
+                case "final":
+                    if event_data.get("pipeline_id"):
+                        pipeline_id = event_data["pipeline_id"]
+
+                case "code_generated":
+                    if event_data.get("pipeline_code"):
+                        pipeline_code = event_data["pipeline_code"]
+
+                case "llm":
+                    delta = event_data.get("delta", "")
+                    assistant_response += delta
+
+                case "step":
+                    status = event_data.get("status")
+                    # Only save if status is completed or error (final states)
+                    if status in ["completed", "error"]:
+                        step_key = f"{event_data.get('step_number')}_{event_data.get('step_name')}"
+                        build_steps[step_key] = {
+                            "step_number": event_data.get("step_number"),
+                            "step_name": event_data.get("step_name"),
+                            "message": event_data.get("message"),
+                            "status": status,
+                            "error": event_data.get("error")
+                        }
+
+            yield event
+
+        # Save assistant response and update chat after streaming completes
+        if chat_id and assistant_response:
+            async with self.db_service.AsyncSessionLocal() as session:
+                # Convert dict to sorted list by step_number
+                steps_list = sorted(build_steps.values(), key=lambda x: x["step_number"]) if build_steps else []
+
+                await self.save_assistant_message_with_steps(
+                    chat_id=chat_id,
+                    content=assistant_response,
+                    pipeline_id=pipeline_id,
+                    pipeline_code=pipeline_code,
+                    steps=steps_list,
+                    session=session
+                )
+
+                # Update chat with pipeline_id if provided
+                if pipeline_id:
+                    await self.update_chat_with_pipeline(chat_id, pipeline_id, session=session)
+
+                await session.commit()
+
+    async def save_chat_interaction(
+        self,
+        chat_id: str,
+        user_message: str,
+        assistant_response: str,
+        pipeline_id: Optional[str] = None,
+        pipeline_code: Optional[str] = None,
+        build_steps: Optional[dict] = None
+    ) -> bool:
+        """
+        Save complete chat interaction (user message, assistant response, and chat update)
+        in a single database transaction by reusing existing methods.
+
+        Args:
+            chat_id: The chat identifier
+            user_message: The user's message content
+            assistant_response: The assistant's response content
+            pipeline_id: Optional pipeline identifier
+            pipeline_code: Optional pipeline code
+            build_steps: Optional dict of build steps
+
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            async with self.db_service.AsyncSessionLocal() as session:
+
+                await self.save_user_message(chat_id, user_message, session=session)
+
+                if assistant_response:
+                    # Convert dict to sorted list by step_number
+                    steps_list = sorted(build_steps.values(), key=lambda x: x["step_number"]) if build_steps else []
+
+                    await self.save_assistant_message_with_steps(
+                        chat_id=chat_id,
+                        content=assistant_response,
+                        pipeline_id=pipeline_id,
+                        pipeline_code=pipeline_code,
+                        steps=steps_list,
+                        session=session
+                    )
+
+                # 3. Update chat with pipeline_id if provided
+                if pipeline_id:
+                    await self.update_chat_with_pipeline(chat_id, pipeline_id, session=session)
+
+                # Commit all changes in one transaction
+                await session.commit()
+                return True
+        except Exception as e:
+            self.logger.error(f"Failed to save chat interaction: {e}")
+            return False
+
+    async def save_user_message(self, chat_id: str, content: str, session) -> bool:
+        """
+        Save a user message to the database using ORM.
+
+        Args:
+            chat_id: The chat identifier
+            content: The message content
+            session: Database session (caller manages lifecycle and commit)
+
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            new_message = ChatMessage(
+                chat_id=chat_id,
+                role="user",
+                content=content
+            )
+            session.add(new_message)
+            return True
+        except Exception as e:
+            self.logger.error(f"Failed to save user message: {e}")
+            return False
+
+    async def save_assistant_message_with_steps(
+        self,
+        chat_id: str,
+        content: str,
+        session,
+        pipeline_id: Optional[str] = None,
+        pipeline_code: Optional[str] = None,
+        steps: Optional[list] = None
+    ) -> bool:
+        """
+        Save an assistant message with optional pipeline steps and metadata using ORM.
+
+        Args:
+            chat_id: The chat identifier
+            content: The assistant's message content
+            session: Database session (caller manages lifecycle and commit)
+            pipeline_id: Optional pipeline identifier
+            pipeline_code: Optional pipeline code
+            steps: Optional list of build steps
+
+        Returns:
+            True if successful, False otherwise
+        """
+        extra_data = None
+        if steps or pipeline_code:
+            extra_data = {
+                "type": "steps",
+                "pipeline_id": pipeline_id,
+                "pipeline_code": pipeline_code,
+                "steps": steps
+            }
+
+        try:
+            new_message = ChatMessage(
+                chat_id=chat_id,
+                role="assistant",
+                content=content,
+                extra_data=extra_data
+            )
+            session.add(new_message)
+            return True
+        except Exception as e:
+            self.logger.error(f"Failed to save assistant message: {e}")
+            return False
+
+    async def update_chat_with_pipeline(self, chat_id: str, pipeline_id: str, session) -> bool:
+        """
+        Update a chat record with the associated pipeline ID using ORM.
+
+        Args:
+            chat_id: The chat identifier
+            pipeline_id: The pipeline identifier to associate
+            session: Database session (caller manages lifecycle and commit)
+
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            stmt = (
+                update(Chat)
+                .where(Chat.id == chat_id)
+                .values(pipeline_id=pipeline_id)
+            )
+            await session.execute(stmt)
+            return True
+        except Exception as e:
+            self.logger.error(f"Failed to update chat with pipeline: {e}")
+            return False
+
+    async def get_chat_history(self, chat_id: str) -> list[dict]:
+        """
+        Retrieve all messages for a specific chat using ORM.
+
+        Args:
+            chat_id: The chat identifier
+
+        Returns:
+            List of message dictionaries
+        """
+        try:
+            async with self.db_service.AsyncSessionLocal() as session:
+                stmt = (
+                    select(ChatMessage)
+                    .where(ChatMessage.chat_id == chat_id)
+                    .order_by(ChatMessage.created_at.asc())
+                )
+                result = await session.execute(stmt)
+                messages = result.scalars().all()
+
+                return [msg.to_dict() for msg in messages]
+        except Exception as e:
+            self.logger.error(f"Failed to retrieve chat history: {e}")
+            raise
+
+    async def get_chat_id_by_pipeline(self, pipeline_id: str) -> Optional[str]:
+        """
+        Find the chat ID associated with a specific pipeline using ORM.
+
+        Args:
+            pipeline_id: The pipeline identifier
+
+        Returns:
+            The chat ID if found, None otherwise
+        """
+        try:
+            async with self.db_service.AsyncSessionLocal() as session:
+                stmt = select(Chat).where(Chat.pipeline_id == pipeline_id).limit(1)
+                result = await session.execute(stmt)
+                chat = result.scalar_one_or_none()
+
+                return chat.id if chat else None
+        except Exception as e:
+            self.logger.error(f"Failed to retrieve chat by pipeline: {e}")
+            raise
+
 
     async def run_guards_on_input(self, raw_message: str) -> dict:
         """
         Run prompt guard analysis and LLM guard checks on the input message.
+
+        Delegates to GuardsService for validation logic.
         """
-        # Step 1: Analyze and validate user input
-        analysis = self.prompt_guard_service.analyze(raw_message)
-        logging.info(f"Prompt Guard Analysis: {analysis}")
-        if analysis["decision"] == "block":
-            logging.warning(f"Input blocked: {analysis['findings']}")
-            return {
-                "guard_decision": "block",
-                "error": "Input blocked due to security concerns.",
-                "findings": analysis["findings"]
-            }
-
-        cleaned_input = analysis["cleaned"]
-        # Step 2: Perform LLM Guard Check
-        try:
-            guardResponse = await self.prompt_guard_service.llm_guard_check(cleaned_input)
-        except Exception as e:
-            logging.error(f"Error during LLM Guard Check: {e}")
-            return {
-                "guard_decision": "block",
-                "error": f"LLM Guard Check failed: {str(e)}"
-            }
-
-        logging.info("LLM Guard Response:\n%s", json.dumps(guardResponse, indent=2))
-        if not guardResponse.get("is_safe", False):
-            return {
-                "guard_decision": "block",
-                "error": f"Input blocked by LLM Guard: {guardResponse.get('reason', 'No reason provided')}",
-                "findings": guardResponse.get("violations", [])
-            }
-        return {
-            "guard_decision": "allow",
-            "cleaned_input": cleaned_input
-        }
+        return await self.guards_service.validate_input(raw_message)
 
     async def _run_step(self, step_msg: str, step_number: int, coro, *args, mode="chat", **kwargs):
         """

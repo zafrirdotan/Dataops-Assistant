@@ -80,3 +80,31 @@ async def get_current_superuser(
             detail="Not enough privileges"
         )
     return current_user
+
+
+async def get_optional_current_user(
+    request: Request,
+    db: Session = Depends(get_db)
+) -> Optional[User]:
+    """Get current user if authenticated, None otherwise."""
+    # Get token from httpOnly cookie
+    token = request.cookies.get("access_token")
+    if not token:
+        return None
+
+    try:
+        payload = decode_token(token)
+        if payload is None:
+            return None
+
+        username: Optional[str] = payload.get("sub")
+        user_id: Optional[str] = payload.get("user_id")
+
+        if username is None or user_id is None:
+            return None
+
+        # Query user from database
+        user = db.query(User).filter(User.id == uuid.UUID(user_id)).first()
+        return user
+    except Exception:
+        return None
