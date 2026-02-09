@@ -9,38 +9,89 @@ import { PipelineCode } from "@/components/pipeline-code";
 import { ChatInput, ChatInputHandle } from "@/components/chat-input";
 import { PipelineExamples } from "@/components/pipeline-examples";
 import { AuthDialog } from "@/components/auth-dialog";
+import { usePipelineContext } from "@/contexts/pipeline-context";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
 
 export default function Home() {
+  const { refreshPipelines } = usePipelineContext();
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [steps, setSteps] = useState<StepEvent[]>([]);
   const [pipelineId, setPipelineId] = useState<string | null>(null);
   const [pipelineCode, setPipelineCode] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [loadingHistory, setLoadingHistory] = useState(false);
   const [finalError, setFinalError] = useState<string | null>(null);
   const [showAuthDialog, setShowAuthDialog] = useState(false);
   const [chatId, setChatId] = useState<string | null>(null);
+  const [selectedPipeline, setSelectedPipeline] = useState<string | null>(null);
   const chatInputRef = useRef<ChatInputHandle>(null);
   const scrollEndRef = useRef<HTMLDivElement>(null);
+
+  // Load pipeline chat history when a pipeline is selected
+  useEffect(() => {
+    const loadPipelineHistory = async () => {
+      if (!selectedPipeline) return;
+
+      try {
+        setLoadingHistory(true);
+        setMessages([]);
+        setSteps([]);
+        setPipelineCode(null);
+        setFinalError(null);
+
+        // Fetch chat_id for this pipeline
+        const chatIdRes = await fetch(
+          `http://localhost:8080/chat/by-pipeline/${selectedPipeline}`,
+          {
+            credentials: "include",
+          },
+        );
+
+        if (chatIdRes.ok) {
+          const { chat_id } = await chatIdRes.json();
+          setChatId(chat_id);
+
+          // Fetch chat history
+          if (chat_id) {
+            const historyRes = await fetch(
+              `http://localhost:8080/chat/history/${chat_id}`,
+              {
+                credentials: "include",
+              },
+            );
+
+            if (historyRes.ok) {
+              const { messages } = await historyRes.json();
+
+              if (messages.length > 0) {
+                setMessages(messages as ChatMessage[]);
+              }
+            }
+          }
+        }
+      } catch (error) {
+        console.error("Failed to load pipeline history:", error);
+        setMessages([
+          {
+            role: "system",
+            content: "Failed to load pipeline history. Please try again.",
+          },
+        ]);
+      } finally {
+        setLoadingHistory(false);
+      }
+    };
+
+    loadPipelineHistory();
+  }, [selectedPipeline]);
 
   // Auto-scroll to bottom when new messages, steps, or pipeline data arrive
   useEffect(() => {
     scrollEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, steps, pipelineCode, finalError]);
-
-  const statusClass = useMemo(
-    () =>
-      ({
-        started: "bg-black text-white",
-        completed: "bg-zinc-200 text-black",
-        error: "bg-black text-white",
-        skipped: "bg-zinc-100 text-zinc-700",
-      }) as Record<string, string>,
-    [],
-  );
 
   const parseSSEChunk = (chunk: string): SSEEvent | null => {
     let eventName = "message";
@@ -124,6 +175,8 @@ export default function Home() {
             content: `Pipeline ${data.pipeline_id} created successfully.`,
           },
         ]);
+        // Refresh pipeline list when a new pipeline is created
+        refreshPipelines();
       }
       if (data.error) {
         if (data.error.includes("Pipeline tests failed")) {
@@ -212,27 +265,45 @@ export default function Home() {
     }
   };
 
+  const handlePipelineSelect = (pipelineId: string) => {
+    setSelectedPipeline(pipelineId);
+    setPipelineId(pipelineId);
+  };
+
+  const handleNewChat = () => {
+    setSelectedPipeline(null);
+    setChatId(null);
+    setMessages([]);
+    setSteps([]);
+    setPipelineId(null);
+    setPipelineCode(null);
+    setFinalError(null);
+  };
+
   const hasAssistantMessage = messages.some(
     (message) => message.role === "assistant",
   );
   const showSteps = steps.length > 0;
   const hasStepInProgress = steps.some((step) => step.status === "started");
-  const disableSend = isLoading || hasStepInProgress;
+  const disableSend = isLoading || hasStepInProgress || loadingHistory;
 
   return (
-    <div className="h-screen overflow-hidden bg-white text-black">
-      <div className="mx-auto flex h-screen w-full overflow-hidden">
-        <aside className="hidden w-72 lg:flex lg:sticky lg:self-start lg:h-[calc(100vh-4rem)]">
-          <PipelineNav />
+    <div className="h-screen overflow-hidden bg-white text-black flex flex-col">
+      <AppHeader />
+      <div className="flex flex-1 overflow-hidden">
+        <aside className="hidden w-72 lg:flex lg:h-full">
+          <PipelineNav
+            onPipelineSelect={handlePipelineSelect}
+            onNewChat={handleNewChat}
+            selectedPipelineId={selectedPipeline}
+          />
         </aside>
 
-        <main className="flex flex-1 flex-col gap-6 min-h-0 overflow-hidden">
-          <AppHeader />
-
-          <div className="flex flex-1 items-stretch justify-center min-h-0 overflow-hidden">
-            <div className="flex w-full flex-col gap-4 min-h-0 overflow-hidden">
+        <main className="flex flex-1 flex-col min-h-0 overflow-hidden">
+          <div className="flex flex-1 items-stretch justify-center min-h-0 overflow-hidden px-6">
+            <div className="flex w-full max-w-4xl flex-col gap-4 min-h-0 overflow-hidden mx-auto">
               {messages.length === 0 && !isLoading ? (
-                <div className="flex flex-1 items-center justify-center w-1/2 mx-auto -mt-50">
+                <div className="flex flex-1 items-center justify-center w-full mx-auto -mt-50">
                   <div className="w-full">
                     <h2 className="mb-3 text-center text-3xl font-semibold py-10">
                       Describe the pipeline
@@ -253,7 +324,7 @@ export default function Home() {
               ) : (
                 <>
                   <div className="flex flex-1 flex-col min-h-0 overflow-hidden">
-                    <ScrollArea className="flex-1 min-h-0 rounded-md border border-black/10 bg-white p-4">
+                    <ScrollArea className="flex-1 min-h-0 bg-white p-4">
                       <div className="flex flex-col gap-4">
                         {messages.map((message, idx) => {
                           if (
@@ -300,33 +371,20 @@ export default function Home() {
                                 </div>
                               </div>
                             );
-                          } else if (
-                            message.role === "steps" ||
-                            message.role === "code"
-                          ) {
-                            return (
-                              <div className="flex justify-start">
-                                <div className="flex w-full flex-wrap gap-4">
-                                  {showSteps && (
-                                    <div className="w-[300px] rounded-lg border border-black/10 bg-white px-4 py-3">
-                                      <div className="text-xs font-semibold text-zinc-500">
-                                        Pipeline steps
-                                      </div>
-                                      <div className="mt-3">
-                                        <PipelineSteps steps={steps} />
-                                      </div>
-                                    </div>
-                                  )}
-
-                                  {pipelineCode && (
-                                    <div className="min-w-[280px] flex-1">
-                                      <PipelineCode code={pipelineCode} />
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                            );
+                            if (message.role === "system") {
+                              if (message.extra_data?.type === "steps") {
+                                return (
+                                  <PipelineSteps
+                                    steps={
+                                      message.extra_data?.steps as StepEvent[]
+                                    }
+                                  />
+                                );
+                              }
+                              return null;
+                            }
                           }
+                          return null;
                         })}
 
                         {isLoading && !hasAssistantMessage && (
@@ -337,6 +395,7 @@ export default function Home() {
                           </div>
                         )}
 
+                        {/* Unified display for steps and code - works for both streaming and history */}
                         {(showSteps || pipelineCode) && (
                           <div className="flex justify-start">
                             <div className="flex w-full flex-wrap gap-4">
@@ -374,7 +433,7 @@ export default function Home() {
                     </ScrollArea>
 
                     <div className="sticky bottom-0 border-t border-black/10 bg-white px-4 py-4">
-                      <div className="w-1/2 mx-auto">
+                      <div className="w-full mx-auto">
                         <ChatInput
                           value={input}
                           onChange={setInput}

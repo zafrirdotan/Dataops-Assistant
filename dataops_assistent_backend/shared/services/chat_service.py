@@ -351,17 +351,23 @@ class ChatService:
         # Save assistant response and update chat after streaming completes
         if chat_id and assistant_response:
             async with self.db_service.AsyncSessionLocal() as session:
-                # Convert dict to sorted list by step_number
-                steps_list = sorted(build_steps.values(), key=lambda x: x["step_number"]) if build_steps else []
-
-                await self.save_assistant_message_with_steps(
+                # Save the conversational assistant message (without steps)
+                await self.save_assistant_message(
                     chat_id=chat_id,
                     content=assistant_response,
-                    pipeline_id=pipeline_id,
-                    pipeline_code=pipeline_code,
-                    steps=steps_list,
                     session=session
                 )
+
+                # Save steps as a separate system message if any exist
+                if build_steps:
+                    steps_list = sorted(build_steps.values(), key=lambda x: x["step_number"])
+                    await self.save_steps_message(
+                        chat_id=chat_id,
+                        pipeline_id=pipeline_id,
+                        pipeline_code=pipeline_code,
+                        steps=steps_list,
+                        session=session
+                    )
 
                 # Update chat with pipeline_id if provided
                 if pipeline_id:
@@ -444,6 +450,77 @@ class ChatService:
             return True
         except Exception as e:
             self.logger.error(f"Failed to save user message: {e}")
+            return False
+
+    async def save_assistant_message(
+        self,
+        chat_id: str,
+        content: str,
+        session
+    ) -> bool:
+        """
+        Save a simple assistant message without extra metadata using ORM.
+
+        Args:
+            chat_id: The chat identifier
+            content: The assistant's message content
+            session: Database session (caller manages lifecycle and commit)
+
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            new_message = ChatMessage(
+                chat_id=chat_id,
+                role="assistant",
+                content=content
+            )
+            session.add(new_message)
+            return True
+        except Exception as e:
+            self.logger.error(f"Failed to save assistant message: {e}")
+            return False
+
+    async def save_steps_message(
+        self,
+        chat_id: str,
+        session,
+        pipeline_id: Optional[str] = None,
+        pipeline_code: Optional[str] = None,
+        steps: Optional[list] = None
+    ) -> bool:
+        """
+        Save pipeline steps as a separate system message with minimal content.
+        This separates step tracking from conversational content.
+
+        Args:
+            chat_id: The chat identifier
+            session: Database session (caller manages lifecycle and commit)
+            pipeline_id: Optional pipeline identifier
+            pipeline_code: Optional pipeline code
+            steps: Optional list of build steps
+
+        Returns:
+            True if successful, False otherwise
+        """
+        extra_data = {
+            "type": "steps",
+            "pipeline_id": pipeline_id,
+            "pipeline_code": pipeline_code,
+            "steps": steps or []
+        }
+
+        try:
+            new_message = ChatMessage(
+                chat_id=chat_id,
+                role="system",
+                content="",  # Empty content, steps are in extra_data
+                extra_data=extra_data
+            )
+            session.add(new_message)
+            return True
+        except Exception as e:
+            self.logger.error(f"Failed to save steps message: {e}")
             return False
 
     async def save_assistant_message_with_steps(

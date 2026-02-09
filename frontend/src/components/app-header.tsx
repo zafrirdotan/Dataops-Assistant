@@ -18,7 +18,7 @@ export function AppHeader({
 
   return (
     <header
-      className="flex items-center justify-between py-4 pr-4"
+      className="flex items-center justify-between py-4 px-6 border-b border-zinc-200"
       aria-label="Application header"
     >
       <div>

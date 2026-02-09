@@ -408,11 +408,11 @@ class PipelineBuilderService:
         except Exception as e:
             self.log.debug(f"Event callback failed: {e}")
 
-    async def _emit_step(self, event_callback, step: str, step_number: int, message: str, status: str, **extra) -> None:
+    async def _emit_step(self, event_callback, step_name: str, step_number: int, message: str, status: str, **extra) -> None:
         payload = {
             "event": "step",
             "data": {
-                "step": step,
+                "step_name": step_name,
                 "step_number": step_number,
                 "message": message,
                 "status": status

@@ -3,7 +3,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 import datetime
 
-from dataops_assistent_backend.shared.models.pipeline_types import Pipeline
+from shared.models.pipeline_types import Pipeline
 
 Base = declarative_base()
 
