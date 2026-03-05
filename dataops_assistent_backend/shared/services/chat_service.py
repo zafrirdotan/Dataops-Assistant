@@ -217,25 +217,27 @@ class ChatService:
                 continue
 
         build_spec = await build_task
+        pipeline_code = build_spec.get("pipeline_code")
         if build_spec.get("error") or build_spec.get("success") is False:
             yield {
                 "event": "final",
                 "data": {
                     "success": False,
                     "error": build_spec.get("error") or build_spec.get("details"),
-                    "build_spec": build_spec
-                }
+                    "pipeline_id": build_spec.get("pipeline_id"),
+                    "pipeline_code": pipeline_code,
+                    "build_spec": build_spec,
+                },
             }
             return
-
         yield {
             "event": "final",
             "data": {
                 "success": True,
                 "pipeline_id": build_spec.get("pipeline_id"),
-                "pipeline_code": build_spec.get("pipeline_code"),
-                "build_spec": build_spec
-            }
+                "pipeline_code": pipeline_code,
+                "build_spec": build_spec,
+            },
         }
 
     async def create_new_chat(self) -> Optional[str]:
@@ -301,7 +303,8 @@ class ChatService:
         pipeline_id = None
         pipeline_code = None
         assistant_response = ""
-        build_steps = {}  # Track steps by step name/number, keep only final state
+        build_steps = {}
+        saw_build_final = False
         user_message = raw_message or (messages[-1]["content"] if messages else "")
 
         # Save user message immediately if we have a chat_id
@@ -322,20 +325,18 @@ class ChatService:
 
             match event_type:
                 case "final":
+                    saw_build_final = True
                     if event_data.get("pipeline_id"):
                         pipeline_id = event_data["pipeline_id"]
-
+                    if event_data.get("pipeline_code") is not None:
+                        pipeline_code = event_data["pipeline_code"]
                 case "code_generated":
                     if event_data.get("pipeline_code"):
                         pipeline_code = event_data["pipeline_code"]
-
                 case "llm":
-                    delta = event_data.get("delta", "")
-                    assistant_response += delta
-
+                    assistant_response += event_data.get("delta", "")
                 case "step":
                     status = event_data.get("status")
-                    # Only save if status is completed or error (final states)
                     if status in ["completed", "error"]:
                         step_key = f"{event_data.get('step_number')}_{event_data.get('step_name')}"
                         build_steps[step_key] = {
@@ -343,23 +344,20 @@ class ChatService:
                             "step_name": event_data.get("step_name"),
                             "message": event_data.get("message"),
                             "status": status,
-                            "error": event_data.get("error")
+                            "error": event_data.get("error"),
                         }
 
             yield event
 
-        # Save assistant response and update chat after streaming completes
+        # Persist: assistant message, then steps+code only when build reached terminal state
         if chat_id and assistant_response:
             async with self.db_service.AsyncSessionLocal() as session:
-                # Save the conversational assistant message (without steps)
                 await self.save_assistant_message(
                     chat_id=chat_id,
                     content=assistant_response,
                     session=session
                 )
-
-                # Save steps as a separate system message if any exist
-                if build_steps:
+                if saw_build_final and build_steps:
                     steps_list = sorted(build_steps.values(), key=lambda x: x["step_number"])
                     await self.save_steps_message(
                         chat_id=chat_id,
@@ -368,11 +366,8 @@ class ChatService:
                         steps=steps_list,
                         session=session
                     )
-
-                # Update chat with pipeline_id if provided
                 if pipeline_id:
                     await self.update_chat_with_pipeline(chat_id, pipeline_id, session=session)
-
                 await session.commit()
 
     async def save_chat_interaction(

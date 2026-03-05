@@ -129,15 +129,16 @@ class PipelineBuilderService:
                 return {"error": f"Failed to generate pipeline code: {error}"}
             await self._emit_step(event_callback, build_step, step_number, step_msg, "completed")
 
-            # Emit code_generated event with the pipeline code
+            # Emit code_generated event with the pipeline code (frontend/chat_service expect pipeline_code)
             if event_callback and pipeline_code and "pipeline" in pipeline_code:
+                pipeline_code_payload = {
+                    "pipeline": pipeline_code.get("pipeline", ""),
+                    "tests": pipeline_code.get("pipeline_tests", ""),
+                    "requirements": pipeline_code.get("requirements", ""),
+                }
                 await event_callback({
                     "event": "code_generated",
-                    "data": {
-                        "pipeline": pipeline_code["pipeline"],
-                        "tests": pipeline_code.get("pipeline_tests", ""),
-                        "requirements": pipeline_code.get("requirements", ""),
-                    }
+                    "data": {"pipeline_code": pipeline_code_payload}
                 })
 
             # Step 5: Store pipeline files
@@ -235,7 +236,7 @@ class PipelineBuilderService:
                         return {"success": False, "details": f"Failed to register pipeline: {error}"}
 
                     self.log.info(f"Pipeline {pipeline_id} registered successfully.")
-                    await self._emit_step(event_callback, build_step, step_number, step_msg, "completed", output={"pipeline_id": pipeline_id})
+                    await self._emit_step(event_callback, build_step, step_number, step_msg, "completed", pipeline_code=pipeline_code, output={"pipeline_id": pipeline_id})
                 except Exception as e:
                     self.log.error(f"Failed to register pipeline: {e}")
                     await self._emit_step(event_callback, build_step, step_number, step_msg, "error", error=str(e))
