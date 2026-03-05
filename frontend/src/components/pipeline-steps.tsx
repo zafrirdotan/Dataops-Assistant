@@ -1,3 +1,5 @@
+import type { StepEvent } from "@/types/chat";
+
 type PipelineStepsProps = {
   steps: StepEvent[];
 };
