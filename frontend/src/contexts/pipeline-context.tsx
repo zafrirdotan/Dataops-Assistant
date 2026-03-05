@@ -44,10 +44,14 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const hasDataRef = useRef(false);
 
   const fetchPipelines = useCallback(async () => {
     try {
-      setLoading(true);
+      // Only show full loading on initial load (no data yet); refetches keep list visible
+      if (!hasDataRef.current) {
+        setLoading(true);
+      }
       setError(null);
 
       const response = await fetch(`${API_URL}/pipelines`, {
@@ -58,9 +62,11 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
       if (response.ok) {
         const data = await response.json();
         setPipelines(data);
+        hasDataRef.current = true;
       } else if (response.status === 401 || response.status === 403) {
         // User not authenticated, set empty pipelines
         setPipelines([]);
+        hasDataRef.current = true;
       } else {
         throw new Error(`Failed to fetch pipelines: ${response.statusText}`);
       }
