@@ -48,7 +48,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
 
     return (
       <div className={className}>
-        <div className="mt-4 flex gap-3 border border-black/30 px-4 py-4 rounded-md">
+        <div className="mt-4 flex gap-3 border border-border px-4 py-4 rounded-md">
           <Textarea
             ref={textareaRef}
             placeholder="Describe the pipeline"
@@ -65,7 +65,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
           </div>
         </div>
         {showStatus && (
-          <div className="mt-2 text-xs text-zinc-500">
+          <div className="mt-2 text-xs text-muted-foreground">
             {statusText ?? "Ready"}
           </div>
         )}

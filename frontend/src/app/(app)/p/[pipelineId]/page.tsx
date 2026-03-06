@@ -66,36 +66,36 @@ export default function PipelinePage() {
     <div className="flex-1 min-h-0 flex flex-col overflow-auto p-6">
       {loading ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-3">
-          <Loader2 className="h-8 w-8 animate-spin text-zinc-400" />
-          <p className="text-sm text-zinc-500">Loading pipeline...</p>
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          <p className="text-sm text-muted-foreground">Loading pipeline...</p>
         </div>
       ) : error ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-3">
-          <p className="text-sm text-zinc-600">{error}</p>
+          <p className="text-sm text-muted-foreground">{error}</p>
         </div>
       ) : (
         <div className="flex flex-col gap-6">
-          <header className="rounded-xl border border-zinc-200/80 bg-gradient-to-br from-zinc-50 to-white px-6 py-5 shadow-sm">
-            <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">
+          <header className="rounded-xl border border-border bg-gradient-to-br from-muted to-background px-6 py-5 shadow-sm">
+            <h1 className="text-2xl font-semibold tracking-tight text-foreground">
               {pipeline?.name ?? pipelineId}
             </h1>
             {pipeline?.description && (
-              <p className="mt-2 text-sm leading-relaxed text-zinc-600">
+              <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
                 {pipeline.description}
               </p>
             )}
             <div className="mt-3 flex items-center gap-2">
-              <span className="inline-flex items-center rounded-md bg-zinc-100 px-2.5 py-1 text-xs font-medium text-zinc-600">
+              <span className="inline-flex items-center rounded-md bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground">
                 {scheduleDisplay}
               </span>
             </div>
           </header>
           <div>
-            <h2 className="text-sm font-medium text-zinc-700 mb-2">Code</h2>
+            <h2 className="text-sm font-medium text-foreground mb-2">Code</h2>
             {codeForDisplay ? (
               <PipelineCode code={codeForDisplay} />
             ) : (
-              <p className="text-sm text-zinc-500 py-4">
+              <p className="text-sm text-muted-foreground py-4">
                 No code available for this pipeline.
               </p>
             )}

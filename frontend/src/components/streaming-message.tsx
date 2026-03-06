@@ -38,13 +38,13 @@ export function StreamingMessage({
             <div className="flex flex-col gap-4">
                 {showContent && (
                     <div className="flex justify-start">
-                        <div className="max-w-[85%] rounded-lg bg-zinc-100 px-4 py-2 text-sm leading-6 text-black">
+                        <div className="max-w-[85%] rounded-lg bg-muted px-4 py-2 text-sm leading-6 text-foreground">
                             <ReactMarkdown
                                 remarkPlugins={[remarkGfm]}
                                 rehypePlugins={[rehypeHighlight]}
                                 components={{
                                     pre: ({ children }) => (
-                                        <pre className="overflow-auto rounded-md bg-zinc-900 p-3 text-zinc-100">
+                                        <pre className="overflow-auto rounded-md bg-muted p-3 text-foreground">
                                             {children}
                                         </pre>
                                     ),
@@ -66,7 +66,7 @@ export function StreamingMessage({
                                 left={
                                     showSteps ? (
                                         <>
-                                            <div className="text-xs font-semibold text-zinc-500">
+                                            <div className="text-xs font-semibold text-muted-foreground">
                                                 Pipeline steps
                                             </div>
                                             <div className="mt-3">
@@ -87,7 +87,7 @@ export function StreamingMessage({
 
                 {pipelineError && (
                     <div className="flex justify-start items-center gap-3">
-                        <div className="max-w-[85%] rounded-lg border border-black bg-white px-4 py-2 text-sm text-black">
+                        <div className="max-w-[85%] rounded-lg border border-border bg-card px-4 py-2 text-sm text-card-foreground">
                             {pipelineError}
                         </div>
                         {onRetry && (

@@ -37,8 +37,8 @@ export function PipelineCode({ code }: PipelineCodeProps) {
 \`\`\`python\n${activeFile.content}\n\`\`\`\n`;
 
     return (
-        <div className="flex overflow-hidden rounded-md border border-black/10 bg-white h-[40rem] min-h-0 min-w-0">
-            <div className="w-40 shrink-0 border-r border-black/10 bg-white h-full ">
+        <div className="flex overflow-hidden rounded-md border border-border bg-card h-[40rem] min-h-0 min-w-0">
+            <div className="w-40 shrink-0 border-r border-border bg-card h-full ">
                 <ul className="flex flex-col">
                     {files.map((file, index) => {
                         const isActive = index === activeIndex;
@@ -48,8 +48,8 @@ export function PipelineCode({ code }: PipelineCodeProps) {
                                     type="button"
                                     onClick={() => setActiveIndex(index)}
                                     className={`w-full px-3 py-2 text-left text-xs transition-colors ${isActive
-                                        ? "bg-black text-white"
-                                        : "text-zinc-600 hover:bg-zinc-100"
+                                        ? "bg-primary text-primary-foreground"
+                                        : "text-muted-foreground hover:bg-accent"
                                         }`}
                                 >
                                     {file.name}

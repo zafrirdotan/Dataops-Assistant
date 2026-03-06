@@ -16,22 +16,22 @@ export function UserProfile() {
       </CardHeader>
       <CardContent className="space-y-4">
         <div>
-          <p className="text-sm text-gray-600">Username</p>
-          <p className="font-medium">{user.username}</p>
+          <p className="text-sm text-muted-foreground">Username</p>
+          <p className="font-medium text-foreground">{user.username}</p>
         </div>
         <div>
-          <p className="text-sm text-gray-600">Email</p>
-          <p className="font-medium">{user.email}</p>
+          <p className="text-sm text-muted-foreground">Email</p>
+          <p className="font-medium text-foreground">{user.email}</p>
         </div>
         <div>
-          <p className="text-sm text-gray-600">Account Status</p>
-          <p className="font-medium">
+          <p className="text-sm text-muted-foreground">Account Status</p>
+          <p className="font-medium text-foreground">
             {user.is_active ? "Active" : "Inactive"}
           </p>
         </div>
         <div>
-          <p className="text-sm text-gray-600">Role</p>
-          <p className="font-medium">{user.is_superuser ? "Admin" : "User"}</p>
+          <p className="text-sm text-muted-foreground">Role</p>
+          <p className="font-medium text-foreground">{user.is_superuser ? "Admin" : "User"}</p>
         </div>
         <Button onClick={logout} variant="destructive" className="w-full">
           Logout

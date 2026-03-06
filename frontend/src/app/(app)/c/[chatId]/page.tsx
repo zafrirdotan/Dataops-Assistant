@@ -13,7 +13,7 @@ export default function ChatPage() {
   if (!chatId) {
     return (
       <div className="flex flex-1 items-center justify-center px-6">
-        <p className="text-sm text-zinc-500">Invalid chat</p>
+        <p className="text-sm text-muted-foreground">Invalid chat</p>
       </div>
     );
   }

@@ -115,8 +115,8 @@ export function ResizablePipelinePanels({
     return (
         <div ref={wrapperRef} className={className}>
             {/* Mobile: stacked, each panel full width */}
-            <div className="flex w-full flex-col gap-0 rounded-lg border border-black/10 overflow-hidden bg-white min-h-[280px] md:hidden">
-                <div className="min-h-[200px] border-b border-black/10">{stepsContent}</div>
+            <div className="flex w-full flex-col gap-0 rounded-lg border border-border overflow-hidden bg-card min-h-[280px] md:hidden">
+                <div className="min-h-[200px] border-b border-border">{stepsContent}</div>
                 <div className="min-h-[280px] flex-1">{codeContent}</div>
             </div>
             {/* Desktop: resizable 25% steps / 75% code by default */}
@@ -124,7 +124,7 @@ export function ResizablePipelinePanels({
                 <ResizablePanelGroup
                     orientation="horizontal"
                     onLayoutChanged={onLayoutChanged}
-                    className="h-full rounded-lg border border-black/10 overflow-hidden bg-white"
+                    className="h-full rounded-lg border border-border overflow-hidden bg-card"
                 >
                     <ResizablePanel
                         defaultSize={DEFAULT_STEPS_SIZE}

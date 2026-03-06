@@ -5,17 +5,17 @@ type PipelineStepsProps = {
 };
 
 const statusClass: Record<string, string> = {
-  pending: "bg-yellow-100 text-yellow-800",
-  running: "bg-blue-100 text-blue-800",
-  completed: "bg-green-100 text-green-800",
-  failed: "bg-red-100 text-red-800",
+  pending: "bg-yellow-500/20 text-yellow-700 dark:text-yellow-400",
+  running: "bg-blue-500/20 text-blue-700 dark:text-blue-400",
+  completed: "bg-green-500/20 text-green-700 dark:text-green-400",
+  failed: "bg-red-500/20 text-red-700 dark:text-red-400",
 };
 
 export function PipelineSteps({ steps }: PipelineStepsProps) {
   return (
     <div className="flex flex-col gap-3">
       {steps.length === 0 && (
-        <p className="text-sm text-zinc-400">No steps yet.</p>
+        <p className="text-sm text-muted-foreground">No steps yet.</p>
       )}
       {steps.map((step) => (
         <div
@@ -23,19 +23,19 @@ export function PipelineSteps({ steps }: PipelineStepsProps) {
           className="flex flex-col gap-1"
         >
           <div className="flex items-center justify-between text-xs">
-            <span className="font-medium">
+            <span className="font-medium text-foreground">
               {step.step_number}. {step.message}
             </span>
             <span
-              className={`rounded border border-black/20 px-2 py-0.5 ${
-                statusClass[step.status] ?? "bg-white"
+              className={`rounded border border-border px-2 py-0.5 ${
+                statusClass[step.status] ?? "bg-muted text-muted-foreground"
               }`}
             >
               {step.status}
             </span>
           </div>
-          <p className="text-xs text-zinc-500">{step.message}</p>
-          {step.error && <p className="text-xs text-black">{step.error}</p>}
+          <p className="text-xs text-muted-foreground">{step.message}</p>
+          {step.error && <p className="text-xs text-destructive">{step.error}</p>}
         </div>
       ))}
     </div>

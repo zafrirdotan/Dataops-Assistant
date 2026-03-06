@@ -56,14 +56,14 @@ export function ChatsList({ refreshChatsTrigger = 0 }: ChatsListProps) {
   if (chatsLoading) {
     return (
       <div className="flex items-center justify-center py-8">
-        <Loader2 className="h-5 w-5 animate-spin text-zinc-400" />
+        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
       </div>
     );
   }
 
   if (chats.length === 0) {
     return (
-      <div className="px-4 py-4 text-xs text-zinc-500">
+      <div className="px-4 py-4 text-xs text-muted-foreground">
         No chats yet. Start a conversation below.
       </div>
     );
@@ -77,8 +77,8 @@ export function ChatsList({ refreshChatsTrigger = 0 }: ChatsListProps) {
         return (
           <li
             key={chat.id}
-            className={`px-3 cursor-pointer transition-colors py-2 ${
-              isSelected ? "text-zinc-900 bg-zinc-100 rounded-lg " : "text-zinc-600"
+            className={`px-3 cursor-pointer transition-colors py-2 rounded-lg ${
+              isSelected ? "text-foreground bg-accent" : "text-muted-foreground"
             }`}
             onClick={() => handleChatClick(chat)}
           >

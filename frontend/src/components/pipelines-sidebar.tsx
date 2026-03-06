@@ -75,16 +75,16 @@ export function PipelinesSidebar({
   return (
     <div
       className={cn(
-        "flex h-full w-96 flex-col border-r border-zinc-200 bg-white",
+        "flex h-full w-96 flex-col border-r border-border bg-background",
         className,
       )}
     >
-      <div className="flex items-center justify-between border-b border-zinc-200 p-4">
-        <h2 className="text-lg font-semibold">Pipelines</h2>
+      <div className="flex items-center justify-between border-b border-border p-4">
+        <h2 className="text-lg font-semibold text-foreground">Pipelines</h2>
         <Button
           size="sm"
           onClick={onNewChat}
-          className="bg-black hover:bg-zinc-800"
+          className="bg-primary text-primary-foreground hover:bg-primary/90"
         >
           <Plus className="mr-1 h-4 w-4" />
           New
@@ -93,11 +93,11 @@ export function PipelinesSidebar({
 
       <ScrollArea className="flex-1">
         {loading ? (
-          <div className="p-4 text-center text-sm text-zinc-500">
+          <div className="p-4 text-center text-sm text-muted-foreground">
             Loading...
           </div>
         ) : pipelines.length === 0 ? (
-          <div className="p-4 text-center text-sm text-zinc-500">
+          <div className="p-4 text-center text-sm text-muted-foreground">
             No pipelines yet. Start a new chat to create one!
           </div>
         ) : (
@@ -107,24 +107,24 @@ export function PipelinesSidebar({
                 key={pipeline.pipeline_id}
                 onClick={() => onPipelineSelect(pipeline.pipeline_id)}
                 className={cn(
-                  "w-96  p-3 text-left transition-all hover:border-zinc-300 hover:bg-zinc-50",
+                  "w-96 p-3 text-left transition-all hover:border-border hover:bg-accent border rounded-md",
                   selectedPipelineId === pipeline.pipeline_id
-                    ? "border-black bg-zinc-100"
-                    : "border-zinc-200 bg-white",
+                    ? "border-primary bg-accent"
+                    : "border-border bg-background",
                 )}
               >
                 <div className="mb-2 flex items-start justify-between gap-2">
-                  <h3 className="flex-1 truncate text-sm font-medium">
+                  <h3 className="flex-1 truncate text-sm font-medium text-foreground">
                     {pipeline.name}
                   </h3>
                   <span
                     className={cn(
                       "flex-shrink-0 rounded-full px-2 py-0.5 text-xs",
                       pipeline.status === "deployed"
-                        ? "bg-green-100 text-green-700"
+                        ? "bg-green-500/20 text-green-700 dark:text-green-400"
                         : pipeline.status === "draft"
-                          ? "bg-zinc-100 text-zinc-700"
-                          : "bg-yellow-100 text-yellow-700",
+                          ? "bg-muted text-muted-foreground"
+                          : "bg-yellow-500/20 text-yellow-700 dark:text-yellow-400",
                     )}
                   >
                     {pipeline.status}
@@ -132,12 +132,12 @@ export function PipelinesSidebar({
                 </div>
 
                 {pipeline.description && (
-                  <p className="mb-2 line-clamp-2 text-xs text-zinc-600">
+                  <p className="mb-2 line-clamp-2 text-xs text-muted-foreground">
                     {pipeline.description}
                   </p>
                 )}
 
-                <div className="flex items-center gap-3 text-xs text-zinc-500">
+                <div className="flex items-center gap-3 text-xs text-muted-foreground">
                   <div className="flex items-center gap-1">
                     <Clock className="h-3 w-3" />
                     {formatDate(pipeline.created_at)}

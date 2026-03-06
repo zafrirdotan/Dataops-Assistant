@@ -21,14 +21,14 @@ export function PipelinesList() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-8">
-        <Loader2 className="h-5 w-5 animate-spin text-zinc-400" />
+        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="px-4 py-4 text-xs text-zinc-500">
+      <div className="px-4 py-4 text-xs text-muted-foreground">
         Failed to load pipelines.
       </div>
     );
@@ -36,7 +36,7 @@ export function PipelinesList() {
 
   if (pipelines.length === 0) {
     return (
-      <div className="px-4 py-4 text-xs text-zinc-500">
+      <div className="px-4 py-4 text-xs text-muted-foreground">
         No pipelines yet.
       </div>
     );
@@ -50,8 +50,8 @@ export function PipelinesList() {
         return (
           <li
             key={pipeline.pipeline_id}
-            className={`px-3 cursor-pointer transition-colors py-2 ${
-              isSelected ? "text-zinc-900 bg-zinc-100 rounded-lg" : "text-zinc-600"
+            className={`px-3 cursor-pointer transition-colors py-2 rounded-lg ${
+              isSelected ? "text-foreground bg-accent" : "text-muted-foreground"
             }`}
             onClick={() => handlePipelineClick(pipeline.pipeline_id)}
           >

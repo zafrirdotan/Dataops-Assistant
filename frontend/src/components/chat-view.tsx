@@ -274,8 +274,8 @@ export function ChatView({ chatId: chatIdProp, pipelineParam }: ChatViewProps) {
       <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
         {messages.length === 0 && loadingHistory ? (
           <div className="flex-1 flex flex-col items-center justify-center px-6">
-            <Loader2 className="h-8 w-8 animate-spin text-zinc-400 mb-3" />
-            <p className="text-sm text-zinc-500">Loading chat...</p>
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground mb-3" />
+            <p className="text-sm text-muted-foreground">Loading chat...</p>
           </div>
         ) : messages.length === 0 && !isLoading ? (
           <div className="flex-1 flex flex-col items-center justify-center px-6">
@@ -298,7 +298,7 @@ export function ChatView({ chatId: chatIdProp, pipelineParam }: ChatViewProps) {
           </div>
         ) : (
           <>
-            <ScrollArea className="flex-1 min-h-0 bg-white p-4 overflow-auto">
+            <ScrollArea className="flex-1 min-h-0 bg-background p-4 overflow-auto">
               <div className="px-2 flex flex-col gap-4">
                 {messages.map((message, idx) => {
                   const isStepsOnly =
@@ -333,10 +333,10 @@ export function ChatView({ chatId: chatIdProp, pipelineParam }: ChatViewProps) {
                             <div
                               className={`max-w-[85%] rounded-lg px-4 py-2 text-sm leading-6 ${
                                 message.role === "user"
-                                  ? "bg-black text-white"
+                                  ? "bg-primary text-primary-foreground"
                                   : message.role === "system"
-                                    ? "border border-black bg-white text-black"
-                                    : "bg-zinc-100 text-black"
+                                    ? "border border-border bg-card text-card-foreground"
+                                    : "bg-muted text-foreground"
                               }`}
                             >
                               <ReactMarkdown
@@ -344,7 +344,7 @@ export function ChatView({ chatId: chatIdProp, pipelineParam }: ChatViewProps) {
                                 rehypePlugins={[rehypeHighlight]}
                                 components={{
                                   pre: ({ children }) => (
-                                    <pre className="overflow-auto rounded-md bg-zinc-900 p-3 text-zinc-100">
+                                    <pre className="overflow-auto rounded-md bg-muted p-3 text-foreground">
                                       {children}
                                     </pre>
                                   ),
@@ -367,7 +367,7 @@ export function ChatView({ chatId: chatIdProp, pipelineParam }: ChatViewProps) {
                                 left={
                                   msgSteps.length > 0 ? (
                                     <>
-                                      <div className="text-xs font-semibold text-zinc-500">
+                                      <div className="text-xs font-semibold text-muted-foreground">
                                         Pipeline steps
                                       </div>
                                       <div className="mt-3">
@@ -392,7 +392,7 @@ export function ChatView({ chatId: chatIdProp, pipelineParam }: ChatViewProps) {
                 })}
                 {isLoading && !hasAssistantMessage && (
                   <div className="flex justify-start">
-                    <div className="max-w-[85%] rounded-lg bg-zinc-100 px-4 py-2 text-sm text-black">
+                    <div className="max-w-[85%] rounded-lg bg-muted px-4 py-2 text-sm text-foreground">
                       Starting work...
                     </div>
                   </div>
@@ -404,7 +404,7 @@ export function ChatView({ chatId: chatIdProp, pipelineParam }: ChatViewProps) {
                         left={
                           showSteps ? (
                             <>
-                              <div className="text-xs font-semibold text-zinc-500">
+                              <div className="text-xs font-semibold text-muted-foreground">
                                 Pipeline steps
                               </div>
                               <div className="mt-3">
@@ -424,7 +424,7 @@ export function ChatView({ chatId: chatIdProp, pipelineParam }: ChatViewProps) {
                 )}
                 {finalError && (
                   <div className="flex justify-start">
-                    <div className="max-w-[85%] rounded-lg border border-black bg-white px-4 py-2 text-sm text-black">
+                    <div className="max-w-[85%] rounded-lg border border-border bg-card px-4 py-2 text-sm text-card-foreground">
                       {finalError}
                     </div>
                   </div>
@@ -432,7 +432,7 @@ export function ChatView({ chatId: chatIdProp, pipelineParam }: ChatViewProps) {
                 <div ref={scrollEndRef} />
               </div>
             </ScrollArea>
-            <div className="flex-shrink-0 bg-white py-2 border-t border-zinc-200">
+            <div className="flex-shrink-0 bg-background py-2 border-t border-border">
               <div className="w-[75%] max-w-[75%] mx-auto px-2">
                 <ChatInput
                   value={input}

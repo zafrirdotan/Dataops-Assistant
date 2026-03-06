@@ -21,7 +21,7 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
     }, [router, setOnNewChat]);
 
     return (
-        <div className="h-screen overflow-hidden bg-white text-black flex flex-col">
+        <div className="h-screen overflow-hidden bg-background text-foreground flex flex-col">
             <div className="flex flex-1 min-h-0">
                 <ResizablePanelGroup orientation="horizontal" className="flex-1 min-h-0">
                     <ResizablePanel defaultSize="20%" className="hidden lg:block min-w-0">
