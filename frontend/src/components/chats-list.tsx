@@ -41,6 +41,9 @@ export function ChatsList({ refreshChatsTrigger = 0 }: ChatsListProps) {
   }, [fetchChats, refreshChatsTrigger]);
 
   const handleChatClick = (chat: ChatListItem) => {
+    const rawPath = pathname ?? "/";
+    const isPipelineDetailPage = rawPath.startsWith("/pipeline/") && rawPath.length > "/pipeline/".length;
+    const targetPath = isPipelineDetailPage ? "/" : rawPath;
     const params = new URLSearchParams(searchParams.toString());
     params.set("chat", chat.id);
     if (chat.pipeline_id) {
@@ -48,7 +51,7 @@ export function ChatsList({ refreshChatsTrigger = 0 }: ChatsListProps) {
     } else {
       params.delete("pipeline");
     }
-    router.replace(`${pathname ?? "/"}?${params.toString()}`);
+    router.replace(`${targetPath}?${params.toString()}`);
   };
 
   if (!isAuthenticated) {
