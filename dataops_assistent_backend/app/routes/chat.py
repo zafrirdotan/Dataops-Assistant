@@ -74,6 +74,18 @@ async def chat_stream_endpoint(
     )
 
 
+@router.get("/list")
+async def list_chats(current_user: User = Depends(get_current_active_user)):
+    """
+    List all chats (id, name, created_at, pipeline_id) ordered by created_at desc.
+    """
+    try:
+        chats = await chat_service.list_chats()
+        return {"chats": chats}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to list chats: {str(e)}")
+
+
 @router.get("/history/{chat_id}")
 async def get_chat_history(
     chat_id: str,

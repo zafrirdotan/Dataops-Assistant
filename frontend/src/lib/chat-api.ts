@@ -11,6 +11,28 @@ export type StreamChatResult = {
   pipelineId?: string;
 };
 
+export type ChatListItem = {
+  id: string;
+  name: string | null;
+  created_at: string | null;
+  pipeline_id: string | null;
+};
+
+/**
+ * GET list of chats. Returns { chats: ChatListItem[] }. Requires auth.
+ */
+export async function getChatsList(): Promise<{ chats: ChatListItem[] }> {
+  const res = await fetch(`${API_BASE}/chat/list`, {
+    credentials: "include",
+  });
+  if (!res.ok) {
+    return { chats: [] };
+  }
+  const json = await res.json();
+  const list = Array.isArray(json.chats) ? json.chats : [];
+  return { chats: list as ChatListItem[] };
+}
+
 /**
  * GET chat_id for a pipeline. Returns { chat_id } or { chat_id: null } when not found / error.
  */

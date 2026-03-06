@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { PipelineNav } from "@/components/pipeline-nav";
 import { AppHeader } from "@/components/app-header";
@@ -10,6 +11,7 @@ import { ChatInput, ChatInputHandle } from "@/components/chat-input";
 import { PipelineExamples } from "@/components/pipeline-examples";
 import { AuthDialog } from "@/components/auth-dialog";
 import { usePipelineContext } from "@/contexts/pipeline-context";
+import { getChatHistory, getChatByPipeline } from "@/lib/chat-api";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
@@ -20,9 +22,13 @@ import {
     ResizableHandle,
 } from "@/components/ui/resizable";
 import { ResizablePipelinePanels } from "@/components/resizable-pipeline-panels";
+import { Loader2 } from "lucide-react";
 
 export default function Home() {
     const { refreshPipelines } = usePipelineContext();
+    const router = useRouter();
+    const pathname = usePathname();
+    const searchParams = useSearchParams();
     const [input, setInput] = useState("");
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [steps, setSteps] = useState<StepEvent[]>([]);
@@ -34,70 +40,88 @@ export default function Home() {
     const [showAuthDialog, setShowAuthDialog] = useState(false);
     const [chatId, setChatId] = useState<string | null>(null);
     const [selectedPipeline, setSelectedPipeline] = useState<string | null>(null);
+    const [refreshChatsTrigger, setRefreshChatsTrigger] = useState(0);
     const chatInputRef = useRef<ChatInputHandle>(null);
     const scrollEndRef = useRef<HTMLDivElement>(null);
 
-    // Load pipeline chat history when a pipeline is selected
-    useEffect(() => {
-        const loadPipelineHistory = async () => {
-            if (!selectedPipeline) return;
+    const chatParam = searchParams.get("chat");
+    const pipelineParam = searchParams.get("pipeline");
 
-            try {
-                setLoadingHistory(true);
+    // Load chat/pipeline from URL (single source of truth)
+    useEffect(() => {
+        const loadFromUrl = async () => {
+            if (chatParam) {
+                // Load history by chat ID
+                setSelectedPipeline(pipelineParam);
+                setPipelineId(pipelineParam);
+                try {
+                    setLoadingHistory(true);
+                    setMessages([]);
+                    setSteps([]);
+                    setPipelineCode(null);
+                    setFinalError(null);
+                    const { messages: historyMessages } = await getChatHistory(chatParam);
+                    setChatId(chatParam);
+                    if (Array.isArray(historyMessages) && historyMessages.length > 0) {
+                        setMessages(historyMessages);
+                    }
+                } catch (error) {
+                    console.error("Failed to load chat history:", error);
+                    setMessages([
+                        {
+                            role: "system",
+                            content: "Failed to load chat history. Please try again.",
+                        },
+                    ]);
+                } finally {
+                    setLoadingHistory(false);
+                }
+            } else if (pipelineParam) {
+                // Load by pipeline
+                setSelectedPipeline(pipelineParam);
+                setPipelineId(pipelineParam);
+                try {
+                    setLoadingHistory(true);
+                    setMessages([]);
+                    setSteps([]);
+                    setPipelineCode(null);
+                    setFinalError(null);
+                    const { chat_id } = await getChatByPipeline(pipelineParam);
+                    setChatId(chat_id);
+                    if (chat_id) {
+                        const { messages: historyMessages } = await getChatHistory(chat_id);
+                        if (Array.isArray(historyMessages) && historyMessages.length > 0) {
+                            setMessages(historyMessages);
+                        }
+                    }
+                } catch (error) {
+                    console.error("Failed to load pipeline history:", error);
+                    setMessages([
+                        {
+                            role: "system",
+                            content: "Failed to load pipeline history. Please try again.",
+                        },
+                    ]);
+                } finally {
+                    setLoadingHistory(false);
+                }
+            } else {
+                setSelectedPipeline(null);
+                setPipelineId(null);
+                setChatId(null);
                 setMessages([]);
                 setSteps([]);
                 setPipelineCode(null);
                 setFinalError(null);
-
-                // Fetch chat_id for this pipeline
-                const chatIdRes = await fetch(
-                    `http://localhost:8080/chat/by-pipeline/${selectedPipeline}`,
-                    {
-                        credentials: "include",
-                    },
-                );
-
-                if (chatIdRes.ok) {
-                    const { chat_id } = await chatIdRes.json();
-                    setChatId(chat_id);
-
-                    // Fetch chat history
-                    if (chat_id) {
-                        const historyRes = await fetch(
-                            `http://localhost:8080/chat/history/${chat_id}`,
-                            {
-                                credentials: "include",
-                            },
-                        );
-
-                        if (historyRes.ok) {
-                            const { messages } = await historyRes.json();
-
-                            if (messages.length > 0) {
-                                setMessages(messages as ChatMessage[]);
-                            }
-                        }
-                    }
-                }
-            } catch (error) {
-                console.error("Failed to load pipeline history:", error);
-                setMessages([
-                    {
-                        role: "system",
-                        content: "Failed to load pipeline history. Please try again.",
-                    },
-                ]);
-            } finally {
-                setLoadingHistory(false);
             }
         };
 
-        loadPipelineHistory();
-    }, [selectedPipeline]);
+        loadFromUrl();
+    }, [chatParam, pipelineParam]);
 
     // Auto-scroll to bottom when new messages, steps, or pipeline data arrive
     useEffect(() => {
-        scrollEndRef.current?.scrollIntoView({ behavior: "smooth" });
+        scrollEndRef.current?.scrollIntoView({ behavior: "auto" });
     }, [messages, steps, pipelineCode, finalError]);
 
     const parseSSEChunk = (chunk: string): SSEEvent | null => {
@@ -122,10 +146,16 @@ export default function Home() {
 
     const handleEvent = (evt: SSEEvent) => {
         if (evt.event === "chat_created") {
-            const data = evt.data as { chat_id?: string };
+            const data = evt.data as { chat_id?: string; name?: string };
             if (data.chat_id) {
                 setChatId(data.chat_id);
             }
+            setRefreshChatsTrigger((t) => t + 1);
+            return;
+        }
+
+        if (evt.event === "chat_name_updated") {
+            setRefreshChatsTrigger((t) => t + 1);
             return;
         }
 
@@ -175,13 +205,13 @@ export default function Home() {
                 setPipelineCode(JSON.stringify(data.pipeline_code, null, 2));
             }
             if (data.success && data.pipeline_id) {
-                setMessages((prev) => [
-                    ...prev,
-                    {
-                        role: "assistant",
-                        content: `Pipeline ${data.pipeline_id} created successfully.`,
-                    },
-                ]);
+                // setMessages((prev) => [
+                //     ...prev,
+                //     {
+                //         role: "assistant",
+                //         content: `Pipeline ${data.pipeline_id} created successfully.`,
+                //     },
+                // ]);
                 // Refresh pipeline list when a new pipeline is created
                 refreshPipelines();
             }
@@ -273,18 +303,14 @@ export default function Home() {
     };
 
     const handlePipelineSelect = (pipelineId: string) => {
-        setSelectedPipeline(pipelineId);
-        setPipelineId(pipelineId);
+        const params = new URLSearchParams(searchParams.toString());
+        params.set("pipeline", pipelineId);
+        params.delete("chat");
+        router.replace(`${pathname ?? "/"}?${params.toString()}`);
     };
 
     const handleNewChat = () => {
-        setSelectedPipeline(null);
-        setChatId(null);
-        setMessages([]);
-        setSteps([]);
-        setPipelineId(null);
-        setPipelineCode(null);
-        setFinalError(null);
+        router.replace(pathname ?? "/");
     };
 
     const hasAssistantMessage = messages.some(
@@ -298,23 +324,29 @@ export default function Home() {
         <div className="h-screen overflow-hidden bg-white text-black flex flex-col">
             <div className="flex flex-1 min-h-0">
                 <ResizablePanelGroup orientation="horizontal" className="flex-1 min-h-0">
-                    <ResizablePanel defaultSize="25%" minSize="20%" maxSize="25%" className="hidden lg:block min-w-0">
+                    <ResizablePanel defaultSize="20%" className="hidden lg:block min-w-0">
                         <aside className="h-full w-full">
                             <PipelineNav
                                 onPipelineSelect={handlePipelineSelect}
                                 onNewChat={handleNewChat}
                                 selectedPipelineId={selectedPipeline}
+                                refreshChatsTrigger={refreshChatsTrigger}
                             />
                         </aside>
                     </ResizablePanel>
                     <ResizableHandle className="hidden lg:flex" withHandle />
-                    <ResizablePanel defaultSize="75%" minSize="60%" maxSize="80%" className="min-w-0 flex flex-col h-full min-h-0">
+                    <ResizablePanel defaultSize="90%" className="min-w-0 flex flex-col h-full min-h-0">
                         <div className="flex-shrink-0">
                             <AppHeader />
                         </div>
 
                         <main className="flex-1 min-h-0 flex flex-col overflow-hidden">
-                            {messages.length === 0 && !isLoading ? (
+                            {messages.length === 0 && loadingHistory ? (
+                                <div className="flex-1 flex flex-col items-center justify-center px-6">
+                                    <Loader2 className="h-8 w-8 animate-spin text-zinc-400 mb-3" />
+                                    <p className="text-sm text-zinc-500">Loading chat...</p>
+                                </div>
+                            ) : messages.length === 0 && !isLoading ? (
                                 <div className="flex-1 flex flex-col items-center justify-center px-6">
                                     <div className="w-full max-w-[75%]">
                                         <h2 className="mb-3 text-center text-3xl font-semibold py-10">

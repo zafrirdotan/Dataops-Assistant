@@ -78,12 +78,16 @@ END $$;
 CREATE TABLE IF NOT EXISTS dataops_assistent.chats (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     pipeline_id VARCHAR(255),
+    name VARCHAR(255),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_pipeline
         FOREIGN KEY (pipeline_id)
         REFERENCES dataops_assistent.pipelines(pipeline_id)
         ON DELETE SET NULL
 );
+
+-- Add name column for existing deployments (no-op if already present)
+ALTER TABLE dataops_assistent.chats ADD COLUMN IF NOT EXISTS name VARCHAR(255);
 
 -- Create chat_messages table for storing conversation history
 CREATE TABLE IF NOT EXISTS dataops_assistent.chat_messages (

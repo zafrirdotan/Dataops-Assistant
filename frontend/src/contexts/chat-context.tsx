@@ -41,7 +41,13 @@ type ChatContextType = {
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
 
-export function ChatProvider({ children }: { children: ReactNode }) {
+type ChatProviderProps = {
+    children: ReactNode;
+    /** Called when chat_created or chat_name_updated is received so the chat list can refetch */
+    onChatListInvalidate?: () => void;
+};
+
+export function ChatProvider({ children, onChatListInvalidate }: ChatProviderProps) {
     const router = useRouter();
     const pathname = usePathname();
     const searchParams = useSearchParams();
@@ -177,10 +183,14 @@ export function ChatProvider({ children }: { children: ReactNode }) {
                     message,
                     chatId: currentChatId,
                     onEvent: (evt: SSEEvent) => {
-                        debugger;
                         if (evt.event === "chat_created") {
-                            const data = evt.data as { chat_id?: string };
+                            const data = evt.data as { chat_id?: string; name?: string };
                             if (data.chat_id) setChatIdFromStream(data.chat_id);
+                            onChatListInvalidate?.();
+                            return;
+                        }
+                        if (evt.event === "chat_name_updated") {
+                            onChatListInvalidate?.();
                             return;
                         }
                         if (evt.event === "step") {

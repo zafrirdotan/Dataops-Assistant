@@ -4,7 +4,7 @@ import asyncio
 from typing import AsyncGenerator, Optional
 import uuid
 
-from sqlalchemy import select, update
+from sqlalchemy import select, update, or_
 
 from shared.services.llm_service import LLMService
 from pipeline_builder.guards.guards_service import GuardsService
@@ -240,6 +240,58 @@ class ChatService:
             },
         }
 
+    @staticmethod
+    def _summary_for_name(text: str, max_len: int = 60) -> str:
+        """Derive a short name from the first user message (fallback, no LLM)."""
+        if not text or not isinstance(text, str):
+            return "New chat"
+        one_line = " ".join(text.split()).strip()
+        if len(one_line) <= max_len:
+            return one_line or "New chat"
+        return one_line[: max_len - 3].rstrip() + "..."
+
+    async def _get_llm_summary_for_name(self, text: str, max_len: int = 60) -> Optional[str]:
+        """Ask the LLM for a short phrase suitable as a chat title. Returns None on failure."""
+        if not text or not isinstance(text, str):
+            return None
+        prompt = (
+            f"Summarize this in one short phrase suitable for a chat title (max {max_len} characters). "
+            "Reply with only the phrase, no quotes or punctuation at the end."
+        )
+        result = await self.llm_service.complete_one_phrase(prompt, text, max_tokens=80)
+        if not result:
+            return None
+        one_line = " ".join(result.split()).strip()
+        if len(one_line) > max_len:
+            one_line = one_line[: max_len - 3].rstrip() + "..."
+        return one_line or None
+
+    async def _get_unique_chat_name(self, session, base_name: str) -> str:
+        """
+        Return base_name if unique; otherwise base_name + " 2", " 3", etc.
+        Queries existing chat names that equal base_name or match "base_name N".
+        """
+        if not base_name:
+            return "New chat"
+        prefix = base_name + " "
+        stmt = select(Chat.name).where(
+            or_(
+                Chat.name == base_name,
+                Chat.name.startswith(prefix, autoescape=True),
+            )
+        )
+        result = await session.execute(stmt)
+        existing = [row[0] for row in result.all()]
+        if not existing:
+            return base_name
+        used = set(existing)
+        if base_name not in used:
+            return base_name
+        suffix = 2
+        while f"{base_name} {suffix}" in used:
+            suffix += 1
+        return f"{base_name} {suffix}"
+
     async def create_new_chat(self) -> Optional[str]:
         """
         Create a new chat record in the database using ORM.
@@ -285,10 +337,12 @@ class ChatService:
             Event dictionaries ready for SSE formatting
         """
         # Create chat if needed
+        chat_just_created = False
         if not chat_id:
             chat_id = await self.create_new_chat()
             if chat_id:
-                yield {"event": "chat_created", "data": {"chat_id": chat_id}}
+                chat_just_created = True
+                yield {"event": "chat_created", "data": {"chat_id": chat_id, "name": "Generating..."}}
 
         # If chat_id provided but no messages, fetch full history from DB
         if chat_id and not messages:
@@ -311,7 +365,20 @@ class ChatService:
         if chat_id and user_message:
             async with self.db_service.AsyncSessionLocal() as session:
                 await self.save_user_message(chat_id, user_message, session=session)
+                if chat_just_created:
+                    await self.update_chat_name(chat_id, "Generating...", session=session)
                 await session.commit()
+
+        # For new chats: compute LLM summary + unique name, then update and emit chat_name_updated
+        if chat_just_created and chat_id and user_message:
+            base_name = await self._get_llm_summary_for_name(user_message)
+            if not base_name:
+                base_name = self._summary_for_name(user_message)
+            async with self.db_service.AsyncSessionLocal() as session:
+                unique_name = await self._get_unique_chat_name(session, base_name)
+                await self.update_chat_name(chat_id, unique_name, session=session)
+                await session.commit()
+            yield {"event": "chat_name_updated", "data": {"chat_id": chat_id, "name": unique_name}}
 
         # Stream events and accumulate state
         async for event in self.process_message_stream(
@@ -587,6 +654,30 @@ class ChatService:
             self.logger.error(f"Failed to update chat with pipeline: {e}")
             return False
 
+    async def update_chat_name(self, chat_id: str, name: str, session) -> bool:
+        """
+        Update a chat record with the given name (e.g. from first user message summary).
+
+        Args:
+            chat_id: The chat identifier
+            name: The display name for the chat
+            session: Database session (caller manages lifecycle and commit)
+
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            stmt = (
+                update(Chat)
+                .where(Chat.id == chat_id)
+                .values(name=name)
+            )
+            await session.execute(stmt)
+            return True
+        except Exception as e:
+            self.logger.error(f"Failed to update chat name: {e}")
+            return False
+
     async def get_chat_history(self, chat_id: str) -> list[dict]:
         """
         Retrieve all messages for a specific chat using ORM.
@@ -633,6 +724,33 @@ class ChatService:
             self.logger.error(f"Failed to retrieve chat by pipeline: {e}")
             raise
 
+    async def list_chats(self) -> list[dict]:
+        """
+        List all chats ordered by created_at descending.
+
+        Returns:
+            List of dicts with id, name, created_at, pipeline_id
+        """
+        try:
+            async with self.db_service.AsyncSessionLocal() as session:
+                stmt = (
+                    select(Chat)
+                    .order_by(Chat.created_at.desc())
+                )
+                result = await session.execute(stmt)
+                chats = result.scalars().all()
+                return [
+                    {
+                        "id": str(c.id),
+                        "name": c.name,
+                        "created_at": c.created_at.isoformat() if c.created_at else None,
+                        "pipeline_id": c.pipeline_id,
+                    }
+                    for c in chats
+                ]
+        except Exception as e:
+            self.logger.error(f"Failed to list chats: {e}")
+            raise
 
     async def run_guards_on_input(self, raw_message: str) -> dict:
         """

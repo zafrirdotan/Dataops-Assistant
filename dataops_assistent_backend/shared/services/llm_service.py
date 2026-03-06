@@ -155,3 +155,27 @@ class LLMService:
 
         except Exception as e:
             yield {"delta": f"LLM stream error: {e}", "done": True}
+
+    async def complete_one_phrase(
+        self, prompt: str, user_content: str, max_tokens: int = 80
+    ) -> Optional[str]:
+        """
+        Single completion for short, one-phrase responses (e.g. chat title).
+        Returns the assistant reply text or None on failure.
+        """
+        if self.provider != "openai" or not self.api_key or not self.async_client:
+            return None
+        try:
+            response = await self.async_client.chat.completions.create(
+                model="gpt-4o",
+                messages=[
+                    {"role": "system", "content": prompt},
+                    {"role": "user", "content": user_content},
+                ],
+                temperature=0,
+                max_tokens=max_tokens,
+            )
+            content = response.choices[0].message.content
+            return content.strip() if content else None
+        except Exception:
+            return None
