@@ -1,0 +1,54 @@
+"use client";
+
+import {
+  ResizablePanelGroup,
+  ResizablePanel,
+  ResizableHandle,
+} from "@/components/ui/resizable";
+import { SideNav } from "@/components/side-nav";
+import { AppHeader } from "@/components/app-header";
+import { SidebarProvider, useSidebar } from "@/contexts/sidebar-context";
+
+function AppLayoutContent({ children }: { children: React.ReactNode }) {
+  const { refreshChatsTrigger, onNewChat } = useSidebar();
+  return (
+    <div className="h-screen overflow-hidden bg-white text-black flex flex-col">
+      <div className="flex flex-1 min-h-0">
+        <ResizablePanelGroup orientation="horizontal" className="flex-1 min-h-0">
+          <ResizablePanel defaultSize="20%" className="hidden lg:block min-w-0">
+            <aside className="h-full w-full">
+              <SideNav
+                onNewChat={onNewChat}
+                refreshChatsTrigger={refreshChatsTrigger}
+              />
+            </aside>
+          </ResizablePanel>
+          <ResizableHandle className="hidden lg:flex" withHandle />
+          <ResizablePanel
+            defaultSize="90%"
+            className="min-w-0 flex flex-col h-full min-h-0"
+          >
+            <div className="flex-shrink-0">
+              <AppHeader />
+            </div>
+            <main className="flex-1 min-h-0 flex flex-col overflow-hidden">
+              {children}
+            </main>
+          </ResizablePanel>
+        </ResizablePanelGroup>
+      </div>
+    </div>
+  );
+}
+
+export default function AppLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <SidebarProvider>
+      <AppLayoutContent>{children}</AppLayoutContent>
+    </SidebarProvider>
+  );
+}
