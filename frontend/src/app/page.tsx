@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { PipelineNav } from "@/components/pipeline-nav";
+import { SideNav } from "@/components/side-nav";
 import { AppHeader } from "@/components/app-header";
 import { PipelineSteps } from "@/components/pipeline-steps";
 import { PipelineCode } from "@/components/pipeline-code";
@@ -302,13 +302,6 @@ export default function Home() {
         }
     };
 
-    const handlePipelineSelect = (pipelineId: string) => {
-        const params = new URLSearchParams(searchParams.toString());
-        params.set("pipeline", pipelineId);
-        params.delete("chat");
-        router.replace(`${pathname ?? "/"}?${params.toString()}`);
-    };
-
     const handleNewChat = () => {
         router.replace(pathname ?? "/");
     };
@@ -326,10 +319,8 @@ export default function Home() {
                 <ResizablePanelGroup orientation="horizontal" className="flex-1 min-h-0">
                     <ResizablePanel defaultSize="20%" className="hidden lg:block min-w-0">
                         <aside className="h-full w-full">
-                            <PipelineNav
-                                onPipelineSelect={handlePipelineSelect}
+                            <SideNav
                                 onNewChat={handleNewChat}
-                                selectedPipelineId={selectedPipeline}
                                 refreshChatsTrigger={refreshChatsTrigger}
                             />
                         </aside>
