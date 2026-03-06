@@ -1,7 +1,7 @@
 "use client";
 
 import { useAuth } from "@/hooks/useAuth";
-import { useRouter, usePathname, useSearchParams } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { useState, useEffect, useCallback } from "react";
 import { getChatsList } from "@/lib/chat-api";
@@ -16,11 +16,13 @@ export function ChatsList({ refreshChatsTrigger = 0 }: ChatsListProps) {
   const { user } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
-  const searchParams = useSearchParams();
   const [chats, setChats] = useState<ChatListItem[]>([]);
   const [chatsLoading, setChatsLoading] = useState(false);
 
-  const selectedChatId = searchParams.get("chat");
+  const selectedChatId =
+    pathname?.startsWith("/c/") && pathname !== "/c"
+      ? pathname.replace(/^\/c\/?/, "").split("/")[0]
+      : null;
   const isAuthenticated = !!user;
 
   const fetchChats = useCallback(async () => {
@@ -41,17 +43,10 @@ export function ChatsList({ refreshChatsTrigger = 0 }: ChatsListProps) {
   }, [fetchChats, refreshChatsTrigger]);
 
   const handleChatClick = (chat: ChatListItem) => {
-    const rawPath = pathname ?? "/";
-    const isPipelineDetailPage = rawPath.startsWith("/pipeline/") && rawPath.length > "/pipeline/".length;
-    const targetPath = isPipelineDetailPage ? "/" : rawPath;
-    const params = new URLSearchParams(searchParams.toString());
-    params.set("chat", chat.id);
-    if (chat.pipeline_id) {
-      params.set("pipeline", chat.pipeline_id);
-    } else {
-      params.delete("pipeline");
-    }
-    router.replace(`${targetPath}?${params.toString()}`);
+    const url = chat.pipeline_id
+      ? `/c/${chat.id}?pipeline=${encodeURIComponent(chat.pipeline_id)}`
+      : `/c/${chat.id}`;
+    router.replace(url);
   };
 
   if (!isAuthenticated) {

@@ -10,12 +10,12 @@ export function PipelinesList() {
   const pathname = usePathname();
 
   const currentPipelineId =
-    pathname?.startsWith("/pipeline/") && pathname !== "/pipeline"
-      ? pathname.replace(/^\/pipeline\/?/, "").split("/")[0]
+    pathname?.startsWith("/p/") && pathname !== "/p"
+      ? pathname.replace(/^\/p\/?/, "").split("/")[0]
       : null;
 
   const handlePipelineClick = (pipelineId: string) => {
-    router.push(`/pipeline/${pipelineId}`);
+    router.push(`/p/${pipelineId}`);
   };
 
   if (loading) {

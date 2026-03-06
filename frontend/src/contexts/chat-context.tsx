@@ -9,7 +9,7 @@ import {
     useRef,
     type ReactNode,
 } from "react";
-import { useRouter, usePathname, useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { getChatByPipeline, getChatHistory, streamChat } from "@/lib/chat-api";
 import { usePipelineContext } from "@/contexts/pipeline-context";
 import type { ChatMessage, SSEEvent, StepEvent } from "@/types/chat";
@@ -49,7 +49,6 @@ type ChatProviderProps = {
 
 export function ChatProvider({ children, onChatListInvalidate }: ChatProviderProps) {
     const router = useRouter();
-    const pathname = usePathname();
     const searchParams = useSearchParams();
     const pipelineFromUrl = searchParams.get("pipeline");
     const { refreshPipelines } = usePipelineContext();
@@ -77,14 +76,13 @@ export function ChatProvider({ children, onChatListInvalidate }: ChatProviderPro
 
     const setSelectedPipelineId = useCallback(
         (id: string | null) => {
-            const base = pathname || "/";
             if (id) {
-                router.replace(`${base}?pipeline=${encodeURIComponent(id)}`);
+                router.replace(`/p/${encodeURIComponent(id)}`);
             } else {
-                router.replace(base);
+                router.replace("/");
             }
         },
-        [router, pathname],
+        [router],
     );
 
     const setSkipFetchForPipeline = useCallback((pipelineId: string) => {
