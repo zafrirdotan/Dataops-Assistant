@@ -41,7 +41,7 @@ export function LoginForm() {
   };
 
   return (
-    <Card className="w-full max-w-md">
+    <Card className="w-full max-w-md border shadow-lg">
       <CardHeader>
         <CardTitle>Login</CardTitle>
         <CardDescription>
