@@ -41,6 +41,7 @@ export function ChatView({ chatId: chatIdProp, pipelineParam }: ChatViewProps) {
   const [chatId, setChatId] = useState<string | null>(chatIdProp);
   const chatInputRef = useRef<ChatInputHandle>(null);
   const scrollEndRef = useRef<HTMLDivElement>(null);
+  const pendingRedirectChatIdRef = useRef<string | null>(null);
 
   // Load chat history when chatId is set (e.g. from /c/[chatId] route)
   useEffect(() => {
@@ -113,8 +114,8 @@ export function ChatView({ chatId: chatIdProp, pipelineParam }: ChatViewProps) {
           setChatId(data.chat_id);
           // New chat flow: redirect to /c/[id] so URL reflects the chat
           if (!chatIdProp) {
+            pendingRedirectChatIdRef.current = data.chat_id;
             incrementRefreshChatsTrigger();
-            router.replace(`/c/${data.chat_id}`);
             return;
           }
         }
@@ -254,9 +255,14 @@ export function ChatView({ chatId: chatIdProp, pipelineParam }: ChatViewProps) {
         },
       ]);
     } finally {
+      const pendingId = pendingRedirectChatIdRef.current;
+      if (pendingId) {
+        router.replace(`/c/${pendingId}`);
+        pendingRedirectChatIdRef.current = null;
+      }
       setIsLoading(false);
     }
-  }, [input, isLoading, chatId, parseSSEChunk, handleEvent]);
+  }, [input, isLoading, chatId, parseSSEChunk, handleEvent, router]);
 
   const hasAssistantMessage = messages.some((m) => m.role === "assistant");
   const showSteps = steps.length > 0;
