@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException, Depends
 import logging
 from pipeline_builder.pipeline_builder_service import PipelineBuilderService
 from pipeline_builder.deployment.dockerize_service import DockerizeService
+from pipeline_builder.deployment.pipeline_output_service import PipelineOutputService
 from pipeline_builder.registry.pipeline_registry_service import getPipelineRegistryService
 from app.core.deps import get_optional_current_user
 from shared.models.user import User
@@ -13,6 +14,7 @@ logger = logging.getLogger("dataops")
 router = APIRouter()
 pipeline_builder = PipelineBuilderService()
 dockerize_service = DockerizeService(logger)
+pipeline_output_service = PipelineOutputService()
 pipeline_registry = getPipelineRegistryService()
 
 @router.post("/trigger-pipeline")
@@ -45,3 +47,19 @@ async def get_pipeline(pipeline_id: str, current_user: Optional[User] = Depends(
 async def get_pipelines(current_user: Optional[User] = Depends(get_optional_current_user)) -> list[Pipeline]:
     """Get all pipelines (optionally filtered by user if authenticated)."""
     return await pipeline_registry.list_pipelines()
+
+
+@router.get("/pipeline/{pipeline_id}/code")
+async def get_pipeline_code(
+    pipeline_id: str, current_user: Optional[User] = Depends(get_optional_current_user)
+) -> dict:
+    """
+    Get pipeline code (and related files) from storage for a given pipeline_id.
+    Returns dict with keys such as pipeline, test_code, requirements.
+    """
+    # Verify pipeline exists in registry
+    pipeline: Pipeline | None = await pipeline_registry.get_pipeline(pipeline_id)
+    if not pipeline:
+        raise HTTPException(status_code=404, detail="Pipeline not found")
+    files = await pipeline_output_service.get_pipeline_files(pipeline_id)
+    return files if files else {}

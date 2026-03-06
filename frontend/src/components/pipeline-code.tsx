@@ -37,7 +37,7 @@ export function PipelineCode({ code }: PipelineCodeProps) {
 \`\`\`python\n${activeFile.content}\n\`\`\`\n`;
 
     return (
-        <div className="flex overflow-hidden rounded-md border border-black/10 bg-white h-[40rem] w-[80%] min-h-0 min-w-0">
+        <div className="flex overflow-hidden rounded-md border border-black/10 bg-white h-[40rem] min-h-0 min-w-0">
             <div className="w-40 shrink-0 border-r border-black/10 bg-white h-full ">
                 <ul className="flex flex-col">
                     {files.map((file, index) => {

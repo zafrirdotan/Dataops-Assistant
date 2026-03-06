@@ -6,6 +6,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useRouter } from "next/navigation";
 import { Loader2, ChevronDown, ChevronRight } from "lucide-react";
 import { ChatsList } from "@/components/chats-list";
+import { PipelinesList } from "@/components/pipelines-list";
 import { useState } from "react";
 
 type SideNavProps = {
@@ -22,6 +23,7 @@ export function SideNav({
     const router = useRouter();
     const isAuthenticated = !!user;
     const [chatsCollapsed, setChatsCollapsed] = useState(false);
+    const [pipelinesCollapsed, setPipelinesCollapsed] = useState(false);
 
     if (authLoading) {
         return (
@@ -52,6 +54,22 @@ export function SideNav({
         </button>
     );
 
+    const PipelinesHeader = () => (
+        <button
+            type="button"
+            onClick={() => setPipelinesCollapsed((c) => !c)}
+            className="flex w-full items-center gap-1 rounded-md px-2 py-1.5 text-left text-sm font-medium text-zinc-700 tracking-tight hover:bg-zinc-200/60 transition-colors"
+            aria-expanded={!pipelinesCollapsed}
+        >
+            {pipelinesCollapsed ? (
+                <ChevronRight className="h-4 w-4 shrink-0 text-zinc-500" />
+            ) : (
+                <ChevronDown className="h-4 w-4 shrink-0 text-zinc-500" />
+            )}
+            <span>Pipelines</span>
+        </button>
+    );
+
     return (
         <nav className="flex h-full flex-col bg-zinc-50/80">
             <div className="px-2 py-2 flex-shrink-0">
@@ -70,11 +88,18 @@ export function SideNav({
                 </div>
             </div>
             {!chatsCollapsed && (
-                <ScrollArea className="flex-1">
+                <ScrollArea>
                     <ChatsList refreshChatsTrigger={refreshChatsTrigger} />
                 </ScrollArea>
             )}
-
+            <div className="px-2 py-2 flex-shrink-0">
+                <PipelinesHeader />
+            </div>
+            {!pipelinesCollapsed && (
+                <ScrollArea>
+                    <PipelinesList />
+                </ScrollArea>
+            )}
         </nav>
     );
 }
