@@ -4,10 +4,9 @@ from pipeline_builder.pipeline_builder_service import PipelineBuilderService
 from pipeline_builder.deployment.dockerize_service import DockerizeService
 from pipeline_builder.deployment.pipeline_output_service import PipelineOutputService
 from pipeline_builder.registry.pipeline_registry_service import getPipelineRegistryService
-from app.core.deps import get_optional_current_user
+from app.core.deps import get_current_user
 from shared.models.user import User
 from shared.models.pipeline_types import Pipeline
-from typing import Optional
 
 logger = logging.getLogger("dataops")
 
@@ -37,21 +36,21 @@ async def trigger_pipeline(pipeline_id: str):
         return {"status": "error", "message": str(e)}
 
 @router.get("/pipeline/{pipeline_id}")
-async def get_pipeline(pipeline_id: str, current_user: Optional[User] = Depends(get_optional_current_user)) -> Pipeline:
+async def get_pipeline(pipeline_id: str, current_user: User = Depends(get_current_user)) -> Pipeline:
     pipeline: Pipeline | None = await pipeline_registry.get_pipeline(pipeline_id)
     if not pipeline:
         raise HTTPException(status_code=404, detail="Pipeline not found")
     return pipeline
 
 @router.get("/pipelines")
-async def get_pipelines(current_user: Optional[User] = Depends(get_optional_current_user)) -> list[Pipeline]:
-    """Get all pipelines (optionally filtered by user if authenticated)."""
+async def get_pipelines(current_user: User = Depends(get_current_user)) -> list[Pipeline]:
+    """Get all pipelines. Requires authentication."""
     return await pipeline_registry.list_pipelines()
 
 
 @router.get("/pipeline/{pipeline_id}/code")
 async def get_pipeline_code(
-    pipeline_id: str, current_user: Optional[User] = Depends(get_optional_current_user)
+    pipeline_id: str, current_user: User = Depends(get_current_user)
 ) -> dict:
     """
     Get pipeline code (and related files) from storage for a given pipeline_id.

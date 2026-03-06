@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 import {
   ResizablePanelGroup,
   ResizablePanel,
@@ -8,9 +10,17 @@ import {
 import { SideNav } from "@/components/side-nav";
 import { AppHeader } from "@/components/app-header";
 import { SidebarProvider, useSidebar } from "@/contexts/sidebar-context";
+import { ProtectedRoute } from "@/components/auth/protected-route";
 
 function AppLayoutContent({ children }: { children: React.ReactNode }) {
-  const { refreshChatsTrigger, onNewChat } = useSidebar();
+  const router = useRouter();
+  const { refreshChatsTrigger, onNewChat, setOnNewChat } = useSidebar();
+
+  // Ensure "New chat" always navigates to home from any page (e.g. when opening /c/[id] directly)
+  useEffect(() => {
+    setOnNewChat(() => router.replace("/"));
+  }, [router, setOnNewChat]);
+
   return (
     <div className="h-screen overflow-hidden bg-white text-black flex flex-col">
       <div className="flex flex-1 min-h-0">
@@ -47,8 +57,10 @@ export default function AppLayout({
   children: React.ReactNode;
 }) {
   return (
-    <SidebarProvider>
-      <AppLayoutContent>{children}</AppLayoutContent>
-    </SidebarProvider>
+    <ProtectedRoute>
+      <SidebarProvider>
+        <AppLayoutContent>{children}</AppLayoutContent>
+      </SidebarProvider>
+    </ProtectedRoute>
   );
 }
