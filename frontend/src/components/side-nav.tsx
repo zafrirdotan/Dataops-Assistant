@@ -116,7 +116,7 @@ export function SideNav({
             <div className="border-t border-sidebar-border my-2 flex-shrink-0" />
             <div className="px-2 py-2 flex-shrink-0 flex flex-col gap-1">
                 <ThemeToggle />
-                {isAuthenticated ? (
+                {isAuthenticated && (
                     <>
                         <Link href="/profile">
                             <Button
@@ -137,27 +137,6 @@ export function SideNav({
                             <LogOut size={16} />
                             Logout
                         </Button>
-                    </>
-                ) : (
-                    <>
-                        <Link href="/login">
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                className="w-full border-0 shadow-none bg-transparent hover:bg-sidebar-accent text-sidebar-foreground"
-                            >
-                                Login
-                            </Button>
-                        </Link>
-                        <Link href="/signup">
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                className="w-full border-0 shadow-none bg-transparent hover:bg-sidebar-accent text-sidebar-foreground"
-                            >
-                                Sign Up
-                            </Button>
-                        </Link>
                     </>
                 )}
             </div>

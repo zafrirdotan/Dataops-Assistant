@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { SideNav } from "@/components/side-nav";
+import { ProtectedRoute } from "@/components/auth/protected-route";
 import { PipelineSteps } from "@/components/pipeline-steps";
 import { PipelineCode } from "@/components/pipeline-code";
 import { ChatInput, ChatInputHandle } from "@/components/chat-input";
@@ -31,14 +32,12 @@ export default function Home() {
     const [input, setInput] = useState("");
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [steps, setSteps] = useState<StepEvent[]>([]);
-    const [pipelineId, setPipelineId] = useState<string | null>(null);
     const [pipelineCode, setPipelineCode] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [loadingHistory, setLoadingHistory] = useState(false);
     const [finalError, setFinalError] = useState<string | null>(null);
     const [showAuthDialog, setShowAuthDialog] = useState(false);
     const [chatId, setChatId] = useState<string | null>(null);
-    const [selectedPipeline, setSelectedPipeline] = useState<string | null>(null);
     const [refreshChatsTrigger, setRefreshChatsTrigger] = useState(0);
     const chatInputRef = useRef<ChatInputHandle>(null);
     const scrollEndRef = useRef<HTMLDivElement>(null);
@@ -51,8 +50,6 @@ export default function Home() {
         const loadFromUrl = async () => {
             if (chatParam) {
                 // Load history by chat ID
-                setSelectedPipeline(pipelineParam);
-                setPipelineId(pipelineParam);
                 try {
                     setLoadingHistory(true);
                     setMessages([]);
@@ -77,8 +74,6 @@ export default function Home() {
                 }
             } else if (pipelineParam) {
                 // Load by pipeline
-                setSelectedPipeline(pipelineParam);
-                setPipelineId(pipelineParam);
                 try {
                     setLoadingHistory(true);
                     setMessages([]);
@@ -105,8 +100,6 @@ export default function Home() {
                     setLoadingHistory(false);
                 }
             } else {
-                setSelectedPipeline(null);
-                setPipelineId(null);
                 setChatId(null);
                 setMessages([]);
                 setSteps([]);
@@ -195,7 +188,6 @@ export default function Home() {
                 success?: boolean;
                 error?: string;
             };
-            setPipelineId(data.pipeline_id ?? null);
             if (data.pipeline_code === undefined || data.pipeline_code === null) {
                 setPipelineCode(null);
             } else if (typeof data.pipeline_code === "string") {
@@ -234,7 +226,6 @@ export default function Home() {
         setMessages((prev) => [...prev, { role: "user", content: trimmed }]);
         setInput("");
         setSteps([]);
-        setPipelineId(null);
         setPipelineCode(null);
         setFinalError(null);
         setIsLoading(true);
@@ -313,6 +304,7 @@ export default function Home() {
     const disableSend = isLoading || hasStepInProgress || loadingHistory;
 
     return (
+        <ProtectedRoute>
         <div className="h-screen overflow-hidden bg-background text-foreground flex flex-col">
             <div className="flex flex-1 min-h-0">
                 <ResizablePanelGroup orientation="horizontal" className="flex-1 min-h-0">
@@ -520,5 +512,6 @@ export default function Home() {
             {/* Authentication Dialog */}
             <AuthDialog open={showAuthDialog} onOpenChange={setShowAuthDialog} />
         </div>
+        </ProtectedRoute>
     );
 }
