@@ -9,6 +9,7 @@ import {
   ReactNode,
   useRef,
 } from "react";
+import { useAuth } from "@/hooks/useAuth";
 
 export type Pipeline = {
   id: number;
@@ -45,6 +46,8 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null);
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
   const hasDataRef = useRef(false);
+  const { isAuthenticated, loading: authLoading } = useAuth();
+  const prevAuthenticatedRef = useRef<boolean | null>(null);
 
   const fetchPipelines = useCallback(async () => {
     try {
@@ -96,6 +99,16 @@ export function PipelineProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     fetchPipelines();
   }, [fetchPipelines]);
+
+  // Refetch when user becomes authenticated (e.g. after login) so pipelines appear
+  useEffect(() => {
+    if (authLoading) return;
+    const wasAuthenticated = prevAuthenticatedRef.current;
+    prevAuthenticatedRef.current = isAuthenticated;
+    if (wasAuthenticated === false && isAuthenticated) {
+      refreshPipelines();
+    }
+  }, [authLoading, isAuthenticated, refreshPipelines]);
 
   // Cleanup debounce timer
   useEffect(() => {
