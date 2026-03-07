@@ -7,6 +7,9 @@ import {
     Bot,
     FileOutput,
     ChevronRight,
+    CalendarClock,
+    Cpu,
+    RefreshCw,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -23,6 +26,11 @@ const destinationNodes = [
     { label: "Parquet", Icon: FileOutput },
     { label: "SQLite", Icon: Database },
     { label: "PostgreSQL", Icon: Database },
+] as const;
+
+const engineOutcomeNodes = [
+    { label: "Creates pipeline", Icon: Cpu },
+    { label: "Airflow schedule", Icon: CalendarClock },
 ] as const;
 
 function FlowNode({
@@ -64,7 +72,7 @@ export function PipelineFlowDiagram({ className }: { className?: string }) {
         <div
             className={cn("w-full max-w-xl", className)}
             role="img"
-            aria-label="Pipeline flow: CSV, PostgreSQL, and API sources feed into AI Pipeline Engine, which outputs to CSV, Parquet, SQLite, and PostgreSQL"
+            aria-label="Pipeline flow: CSV, PostgreSQL, and API sources feed into AI Pipeline Engine, which creates the pipeline and adds an Airflow schedule, and outputs to CSV, Parquet, SQLite, and PostgreSQL"
         >
             {/* Conveyor / assembly line band behind center */}
             <div className="relative flex flex-col items-stretch gap-4 rounded-xl border bg-muted/30 p-4 md:flex-row md:items-center md:justify-between md:gap-2">
@@ -97,14 +105,31 @@ export function PipelineFlowDiagram({ className }: { className?: string }) {
                 <Connector />
 
                 {/* Center: LLM / Robot */}
-                <div className="relative flex justify-center">
-                    <div className="flex flex-col items-center gap-2 rounded-xl border-2 border-primary/20 bg-primary/5 px-4 py-3 shadow-md">
+                <div className="relative flex flex-col items-center justify-center gap-3">
+                    <div className="flex flex-col items-center gap-2 rounded-xl border-2  border-primary/20 bg-primary/5 px-4 py-3 mb-4 shadow-md">
                         <div className="rounded-full bg-primary/10 p-2">
                             <Bot size={28} className="text-primary" />
                         </div>
                         <span className="text-center text-sm font-semibold text-foreground">
                             AI Pipeline Engine
                         </span>
+                    </div>
+                    <div className="flex flex-col items-center justify-center gap-2">
+                        <FlowNode
+                            label={engineOutcomeNodes[0].label}
+                            Icon={engineOutcomeNodes[0].Icon}
+                        />
+                        <div
+                            className="flex shrink-0 items-center justify-center rounded-full bg-muted/80 p-1.5 text-muted-foreground"
+                            title="Cycle"
+                            aria-hidden
+                        >
+                            <RefreshCw size={18} strokeWidth={2} />
+                        </div>
+                        <FlowNode
+                            label={engineOutcomeNodes[1].label}
+                            Icon={engineOutcomeNodes[1].Icon}
+                        />
                     </div>
                 </div>
 
